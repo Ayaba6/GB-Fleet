@@ -96,55 +96,35 @@ export default function UserModal({ editingUser = null, setShowModal, fetchUsers
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white p-6 rounded-2xl shadow-xl w-full max-w-lg animate-in fade-in zoom-in">
-        <h2 className="text-xl font-bold text-gray-800 mb-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-2 sm:p-0">
+      <div className="bg-white dark:bg-gray-800 p-4 sm:p-6 rounded-2xl shadow-xl w-full max-w-lg h-[90vh] sm:h-auto overflow-y-auto animate-in fade-in zoom-in">
+        <h2 className="text-xl sm:text-2xl font-bold text-gray-800 dark:text-gray-100 mb-4 text-center">
           {editingUser ? "Modifier l’utilisateur" : "Créer un utilisateur"}
         </h2>
 
         <form onSubmit={handleSubmit} className="space-y-3">
-          <input
-            name="name"
-            value={form.name}
-            onChange={handleChange}
-            placeholder="Nom complet"
-            className="border p-2 w-full rounded"
-            required
-          />
-          <input
-            name="email"
-            type="email"
-            value={form.email}
-            onChange={handleChange}
-            placeholder="Email"
-            className="border p-2 w-full rounded"
-            required
-          />
-          {!editingUser && (
-            <input
-              name="password"
-              type="password"
-              value={form.password}
-              onChange={handleChange}
-              placeholder="Mot de passe"
-              className="border p-2 w-full rounded"
-              required
-            />
-          )}
-          <input
-            name="phone"
-            value={form.phone}
-            onChange={handleChange}
-            placeholder="Téléphone"
-            className="border p-2 w-full rounded"
-          />
+          {/* Inputs classiques */}
+          {["name", "email", "password", "phone"].map((field) => (
+            (field !== "password" || !editingUser) && (
+              <input
+                key={field}
+                name={field}
+                type={field === "email" ? "email" : field === "password" ? "password" : "text"}
+                value={form[field]}
+                onChange={handleChange}
+                placeholder={field === "name" ? "Nom complet" : field === "email" ? "Email" : field === "password" ? "Mot de passe" : "Téléphone"}
+                className="border border-gray-300 dark:border-gray-600 p-3 w-full rounded-md text-sm sm:text-base bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200"
+                required={field !== "phone"}
+              />
+            )
+          ))}
 
-          {/* Structure en liste déroulante */}
+          {/* Select Structure */}
           <select
             name="structure"
             value={form.structure}
             onChange={handleChange}
-            className="border p-2 w-full rounded"
+            className="border border-gray-300 dark:border-gray-600 p-3 w-full rounded-md bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200"
             required
           >
             <option value="">Sélectionnez une structure</option>
@@ -152,19 +132,19 @@ export default function UserModal({ editingUser = null, setShowModal, fetchUsers
             <option value="GTS">GTS</option>
           </select>
 
-          {/* Role en liste déroulante */}
+          {/* Select Role */}
           <select
             name="role"
             value={form.role}
             onChange={handleChange}
-            className="border p-2 w-full rounded"
+            className="border border-gray-300 dark:border-gray-600 p-3 w-full rounded-md bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200"
           >
             <option value="chauffeur">Chauffeur</option>
             <option value="superviseur">Superviseur</option>
             <option value="admin">Admin</option>
           </select>
 
-          {/* Documents avec upload et expiration */}
+          {/* Upload documents + expiration */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3">
             {[
               { field: "cniburl", exp: "cnib_expiration" },
@@ -173,52 +153,54 @@ export default function UserModal({ editingUser = null, setShowModal, fetchUsers
               { field: "actenaissanceurl", exp: null },
             ].map(({ field, exp }) => (
               <div key={field}>
-                <label className="text-sm text-gray-700 block">
+                <label className="text-sm text-gray-700 dark:text-gray-200 block mb-1">
                   {field.replace("url", "").toUpperCase()} :
-                  <input
-                    type="file"
-                    name={field}
-                    onChange={handleChange}
-                    className="mt-1 w-full"
-                  />
-                  {form[field] && (
-                    <a href={form[field]} target="_blank" className="text-blue-600 text-xs">
-                      Voir fichier
-                    </a>
-                  )}
                 </label>
+                <input
+                  type="file"
+                  name={field}
+                  onChange={handleChange}
+                  className="w-full"
+                />
+                {form[field] && (
+                  <a
+                    href={form[field]}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 dark:text-blue-400 text-xs mt-1 block"
+                  >
+                    Voir fichier
+                  </a>
+                )}
                 {exp && (
                   <input
                     type="date"
                     name={exp}
                     value={form[exp]}
                     onChange={handleChange}
-                    className="border p-2 w-full rounded mt-1"
+                    className="border border-gray-300 dark:border-gray-600 p-2 w-full rounded mt-1 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200"
                   />
                 )}
               </div>
             ))}
           </div>
 
-          <div className="flex justify-end gap-3 pt-3">
+          {/* Footer boutons */}
+          <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4 sticky bottom-0 bg-white dark:bg-gray-800 pb-2">
             <Button
               variant="outline"
               type="button"
               onClick={() => setShowModal(false)}
-              className="border-gray-400"
+              className="border-gray-400 w-full sm:w-auto"
             >
               Annuler
             </Button>
             <Button
               type="submit"
               disabled={loading}
-              className="bg-blue-600 text-white hover:bg-blue-700"
+              className="bg-blue-600 text-white hover:bg-blue-700 w-full sm:w-auto"
             >
-              {loading
-                ? "Enregistrement..."
-                : editingUser
-                ? "Mettre à jour"
-                : "Créer"}
+              {loading ? "Enregistrement..." : editingUser ? "Mettre à jour" : "Créer"}
             </Button>
           </div>
         </form>

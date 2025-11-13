@@ -1,7 +1,10 @@
+// src/pages/AdminDashboard.jsx
 import React, { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../config/supabaseClient.js";
-import { Users, Truck, ClipboardList, Wrench, FileWarning, DollarSign, Sun, Moon } from "lucide-react";
+import { 
+  Users, Truck, ClipboardList, Wrench, FileWarning, Sun, Moon 
+} from "lucide-react";
 import AdminSidebar from "../components/AdminSidebar.jsx";
 import UserSection from "../components/UserSection.jsx";
 import CamionsSection from "../components/CamionsSection.jsx";
@@ -81,23 +84,29 @@ export default function AdminDashboard() {
     navigate("/login");
   }, [navigate]);
 
-  if (loading) return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-100 dark:bg-gray-900">
-      <div className="flex flex-col items-center animate-line-pulse">
-        <div className="rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-500"></div>
-        <p className="text-gray-500 dark:text-gray-300 mt-4 font-medium">Chargement des données...</p>
+  if (loading)
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-100 dark:bg-gray-900">
+        <div className="flex flex-col items-center animate-pulse">
+          <div className="rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-500"></div>
+          <p className="text-gray-500 dark:text-gray-300 mt-4 font-medium">Chargement des données...</p>
+        </div>
       </div>
-    </div>
-  );
+    );
 
   const StatCard = ({ title, value, icon: Icon, color = "blue", onClick }) => (
     <button
       onClick={onClick}
-      className={`flex flex-col items-center justify-center p-6 rounded-2xl shadow-lg bg-${color}-50 dark:bg-${color}-900 hover:shadow-2xl hover:scale-105 transform transition w-full text-center`}
+      className={`flex flex-col items-center justify-center p-4 sm:p-6 rounded-xl shadow-md bg-${color}-50 dark:bg-${color}-900 
+      hover:shadow-xl hover:scale-[1.02] transition w-full text-center`}
     >
-      <Icon className={`w-12 h-12 mb-3 text-${color}-600 dark:text-${color}-300`} />
-      <h3 className={`font-bold text-lg mb-1 text-${color}-800 dark:text-${color}-100`}>{title}</h3>
-      {value !== undefined && <p className={`text-2xl font-extrabold text-${color}-700 dark:text-${color}-200`}>{value}</p>}
+      <Icon className={`w-8 h-8 sm:w-10 sm:h-10 mb-2 text-${color}-600 dark:text-${color}-300`} />
+      <h3 className={`font-semibold text-sm sm:text-lg mb-1 text-${color}-800 dark:text-${color}-100`}>{title}</h3>
+      {value !== undefined && (
+        <p className={`text-lg sm:text-2xl font-extrabold text-${color}-700 dark:text-${color}-200`}>
+          {value}
+        </p>
+      )}
     </button>
   );
 
@@ -110,12 +119,17 @@ export default function AdminDashboard() {
     billing: <BillingExpenses />,
     dashboard: (
       <>
-        <h2 className="text-2xl font-semibold text-gray-800 dark:text-gray-200 mb-6">Localisation de la Flotte</h2>
-        <div className="h-80 sm:h-96 w-full rounded-xl shadow-xl overflow-hidden mb-8 border border-gray-200 dark:border-gray-700">
+        <h2 className="text-xl sm:text-2xl font-semibold text-gray-800 dark:text-gray-200 mb-4 sm:mb-6">
+          Localisation de la Flotte
+        </h2>
+        <div className="h-64 sm:h-80 md:h-96 w-full rounded-xl shadow-lg overflow-hidden mb-6 border border-gray-200 dark:border-gray-700">
           <CarteFlotte camions={camions} center={[12.37, -1.53]} />
         </div>
-        <h2 className="text-2xl font-semibold text-gray-800 dark:text-gray-200 mb-6 mt-4">Statistiques Clés</h2>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
+
+        <h2 className="text-xl sm:text-2xl font-semibold text-gray-800 dark:text-gray-200 mb-4 mt-6">
+          Statistiques Clés
+        </h2>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 sm:gap-6">
           <StatCard title="Utilisateurs" value={stats.users} icon={Users} color="blue" onClick={() => setSection("users")} />
           <StatCard title="Véhicules" value={stats.camions} icon={Truck} color="green" onClick={() => setSection("camions")} />
           <StatCard title="Missions" value={stats.missions} icon={ClipboardList} color="orange" onClick={() => setSection("missions")} />
@@ -127,7 +141,7 @@ export default function AdminDashboard() {
   };
 
   return (
-    <div className="flex min-h-screen bg-gray-100 dark:bg-gray-900">
+    <div className="flex flex-col md:flex-row min-h-screen bg-gray-100 dark:bg-gray-900 overflow-x-hidden">
       <AdminSidebar
         user={user}
         section={section}
@@ -139,22 +153,28 @@ export default function AdminDashboard() {
         toggleDarkMode={toggleDarkMode}
       />
 
-      <div className="flex-1 flex flex-col">
-        <header className="bg-white dark:bg-gray-800 sticky top-0 z-40 shadow-md px-4 sm:px-8 py-4 flex justify-between items-center border-b border-gray-200 dark:border-gray-700">
-          <div className="flex items-center space-x-4">
-            <button onClick={() => setMenuOpen(!menuOpen)} className="md:hidden text-blue-900 dark:text-gray-200 p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition">
+      <div className="flex-1 flex flex-col w-full md:w-auto">
+        <header className="bg-white dark:bg-gray-800 sticky top-0 z-40 shadow-sm px-3 sm:px-6 py-3 flex justify-between items-center border-b border-gray-200 dark:border-gray-700">
+          <div className="flex items-center space-x-3">
+            <button
+              onClick={() => setMenuOpen(!menuOpen)}
+              className="md:hidden text-blue-900 dark:text-gray-200 p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition"
+            >
               ☰
             </button>
-            <h1 className="text-2xl font-extrabold text-gray-900 dark:text-white">
+            <h1 className="text-lg sm:text-2xl font-extrabold text-gray-900 dark:text-white truncate">
               {section === "dashboard" ? "Tableau de Bord" : section.charAt(0).toUpperCase() + section.slice(1)}
             </h1>
           </div>
-          <button onClick={toggleDarkMode} className="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition">
-            {darkMode ? <Sun className="w-6 h-6 text-yellow-400" /> : <Moon className="w-6 h-6 text-gray-800 dark:text-gray-200" />}
+          <button
+            onClick={toggleDarkMode}
+            className="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition"
+          >
+            {darkMode ? <Sun className="w-5 h-5 sm:w-6 sm:h-6 text-yellow-400" /> : <Moon className="w-5 h-5 sm:w-6 sm:h-6 text-gray-800 dark:text-gray-200" />}
           </button>
         </header>
 
-        <main className="flex-1 flex flex-col p-4 sm:p-8 animate-fadeIn">
+        <main className="flex-1 flex flex-col p-3 sm:p-6 md:p-8 animate-fadeIn max-w-full">
           {sectionsMap[section] || sectionsMap.dashboard}
         </main>
       </div>

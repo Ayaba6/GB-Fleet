@@ -6,7 +6,7 @@ import { Card, CardHeader, CardContent } from "../components/ui/card.jsx";
 import { useToast } from "../components/ui/use-toast.jsx";
 import ConfirmDialog from "../components/ui/ConfirmDialog.jsx";
 import UserModal from "./modals/UserModal.jsx";
-import { Pencil, Trash2, Users, FileText, File } from "lucide-react";
+import { Pencil, Trash2, Users, FileText, File, Phone, Mail, User, Calendar } from "lucide-react";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -33,7 +33,11 @@ const renderDocuments = (u) => {
   addDoc(u.carteurl, "Carte");
   addDoc(u.actenaissanceurl, "Acte de naissance");
 
-  return docs.length ? <div className="flex flex-col gap-1">{docs}</div> : <span className="text-gray-400 italic">Aucun</span>;
+  return docs.length ? (
+    <div className="flex flex-col gap-1 mt-1">{docs}</div>
+  ) : (
+    <span className="text-gray-400 italic text-sm">Aucun document</span>
+  );
 };
 
 export default function UserSection() {
@@ -116,20 +120,20 @@ export default function UserSection() {
       body: filteredUsers.map((u) => [u.name, u.email, u.role, u.structure || "", u.phone || "", new Date(u.created_at).toLocaleDateString()]),
       theme: "grid",
       styles: { fontSize: 9 },
-      headStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0] },
     });
     doc.save("liste_utilisateurs.pdf");
     toast({ title: "Export PDF", description: "Le document a été généré." });
   };
 
   return (
-    <div className="p-4 md:p-6 space-y-6 container animate-fadeInUp">
-      <Card className="shadow-xl bg-white/90 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
-        <CardHeader className="flex justify-between items-center p-4 sm:p-6">
-          <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100 flex items-center gap-3">
+    <div className="p-3 sm:p-6 space-y-6 container animate-fadeInUp">
+      {/* En-tête */}
+      <Card className="shadow-lg bg-white/90 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+        <CardHeader className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-800 dark:text-gray-100 flex items-center gap-3">
             <Users size={24} className="text-blue-600 dark:text-blue-400" /> Gestion des utilisateurs
           </h2>
-          <Button onClick={handleAdd} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white">
+          <Button onClick={handleAdd} className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white">
             + Créer utilisateur
           </Button>
         </CardHeader>
@@ -137,93 +141,83 @@ export default function UserSection() {
 
       {/* Filtres */}
       <div className="flex flex-wrap gap-3 items-center justify-between bg-white dark:bg-gray-800 p-4 rounded-xl shadow border border-gray-100 dark:border-gray-700">
-        <div className="flex flex-wrap gap-3 items-center">
-          <input
-            type="text"
-            placeholder="🔍 Rechercher par nom ou email..."
-            value={searchTerm}
-            onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-            className="w-full sm:w-64 border border-gray-300 dark:border-gray-600 rounded px-2 py-1 dark:bg-gray-700 dark:text-gray-200"
-          />
-          <select
-            value={roleFilter}
-            onChange={(e) => { setRoleFilter(e.target.value); setCurrentPage(1); }}
-            className="w-full sm:w-36 border rounded px-2 py-1 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600"
-          >
-            <option value="">Tous rôles</option>
-            <option value="chauffeur">Chauffeur</option>
-            <option value="admin">Admin</option>
-            <option value="superviseur">Superviseur</option>
-          </select>
-          <select
-            value={structureFilter}
-            onChange={(e) => { setStructureFilter(e.target.value); setCurrentPage(1); }}
-            className="w-full sm:w-36 border rounded px-2 py-1 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600"
-          >
-            <option value="">Toutes structures</option>
-            <option value="GTS">GTS</option>
-            <option value="BATICOM">BATICOM</option>
-          </select>
-        </div>
-        <div className="flex gap-2 justify-end w-full md:w-auto mt-2 md:mt-0">
-          <Button onClick={exportExcel} variant="outline" className="flex items-center gap-1 border-green-500 text-green-600 hover:bg-green-50 dark:text-green-400 dark:border-green-400 dark:hover:bg-green-700/20">
-            <File size={16} /> Excel
-          </Button>
-          <Button onClick={exportPDF} variant="outline" className="flex items-center gap-1 border-red-500 text-red-600 hover:bg-red-50 dark:text-red-400 dark:border-red-400 dark:hover:bg-red-700/20">
-            <FileText size={16} /> PDF
-          </Button>
+        <input
+          type="text"
+          placeholder="🔍 Rechercher..."
+          value={searchTerm}
+          onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+          className="flex-1 min-w-[150px] border border-gray-300 dark:border-gray-600 rounded px-2 py-1 dark:bg-gray-700 dark:text-gray-200"
+        />
+        <select
+          value={roleFilter}
+          onChange={(e) => { setRoleFilter(e.target.value); setCurrentPage(1); }}
+          className="border rounded px-2 py-1 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600"
+        >
+          <option value="">Tous rôles</option>
+          <option value="chauffeur">Chauffeur</option>
+          <option value="admin">Admin</option>
+          <option value="superviseur">Superviseur</option>
+        </select>
+        <select
+          value={structureFilter}
+          onChange={(e) => { setStructureFilter(e.target.value); setCurrentPage(1); }}
+          className="border rounded px-2 py-1 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600"
+        >
+          <option value="">Toutes structures</option>
+          <option value="GTS">GTS</option>
+          <option value="BATICOM">BATICOM</option>
+        </select>
+
+        <div className="flex gap-2">
+          <Button onClick={exportExcel} variant="outline" className="border-green-500 text-green-600 dark:text-green-400">Excel</Button>
+          <Button onClick={exportPDF} variant="outline" className="border-red-500 text-red-600 dark:text-red-400">PDF</Button>
         </div>
       </div>
 
-      {/* Tableau */}
-      <div className="overflow-x-auto bg-white dark:bg-gray-800 shadow-xl rounded-xl border border-gray-100 dark:border-gray-700">
-        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-600">
-          <thead className="bg-gray-50 dark:bg-gray-700">
-            <tr>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-200">Nom</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-200">Email</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-200">Téléphone</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-200">Rôle</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-200">Structure</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-200 hidden lg:table-cell">Documents</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-200">Créé le</th>
-              <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 dark:text-gray-200">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="text-sm">
-            {paginatedUsers.length === 0 ? (
-              <tr><td colSpan={8} className="p-8 text-center text-gray-500 dark:text-gray-400">Aucun utilisateur trouvé</td></tr>
-            ) : (
-              paginatedUsers.map((u) => (
-                <tr key={u.id} className="hover:bg-blue-50/50 dark:hover:bg-blue-900/30 transition">
-                  <td className="px-4 py-2 font-medium text-gray-700 dark:text-gray-200">{u.name}</td>
-                  <td className="px-4 py-2 text-gray-600 dark:text-gray-300">{u.email}</td>
-                  <td className="px-4 py-2 text-gray-600 dark:text-gray-300">{u.phone || "-"}</td>
-                  <td className="px-4 py-2 capitalize">{u.role}</td>
-                  <td className="px-4 py-2">{u.structure || "-"}</td>
-                  <td className="px-4 py-2 hidden lg:table-cell">{renderDocuments(u)}</td>
-                  <td className="px-4 py-2 text-gray-500 dark:text-gray-400 text-xs">{new Date(u.created_at).toLocaleDateString()}</td>
-                  <td className="px-4 py-2 flex justify-center gap-2">
-                    <Button variant="outline" size="sm" onClick={() => handleEdit(u)}><Pencil size={16} /></Button>
-                    <Button variant="destructive" size="sm" onClick={() => { setUserToDelete(u); setConfirmOpen(true); }}><Trash2 size={16} /></Button>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+      {/* Liste sous forme de cartes */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {paginatedUsers.length === 0 ? (
+          <p className="text-center col-span-full text-gray-500 dark:text-gray-400">Aucun utilisateur trouvé</p>
+        ) : (
+          paginatedUsers.map((u) => (
+            <Card key={u.id} className="shadow-lg p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+              <div className="flex justify-between items-start">
+                <div>
+                  <h3 className="font-bold text-lg text-gray-800 dark:text-white flex items-center gap-2">
+                    <User size={18} /> {u.name}
+                  </h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-300 flex items-center gap-1"><Mail size={14} /> {u.email}</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-300 flex items-center gap-1"><Phone size={14} /> {u.phone || "-"}</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 capitalize">
+                    <b>Rôle:</b> {u.role} | <b>Structure:</b> {u.structure || "-"}
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="icon" onClick={() => handleEdit(u)}><Pencil size={16} /></Button>
+                  <Button variant="destructive" size="icon" onClick={() => { setUserToDelete(u); setConfirmOpen(true); }}><Trash2 size={16} /></Button>
+                </div>
+              </div>
+
+              <div className="mt-3">{renderDocuments(u)}</div>
+
+              <div className="mt-3 text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                <Calendar size={12} /> Créé le {new Date(u.created_at).toLocaleDateString()}
+              </div>
+            </Card>
+          ))
+        )}
       </div>
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex justify-center gap-2 mt-4 p-2 bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-100 dark:border-gray-700">
+        <div className="flex justify-center gap-2 mt-4">
           {Array.from({ length: totalPages }, (_, i) => (
             <Button
               key={i}
               size="sm"
               variant={i + 1 === currentPage ? "default" : "outline"}
               onClick={() => setCurrentPage(i + 1)}
-              className={i + 1 === currentPage ? "bg-blue-600 hover:bg-blue-700 text-white dark:bg-blue-500 dark:hover:bg-blue-600" : "border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700"}
+              className={i + 1 === currentPage ? "bg-blue-600 text-white" : ""}
             >
               {i + 1}
             </Button>

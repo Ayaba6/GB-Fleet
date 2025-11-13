@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../config/supabaseClient.js";
 import { Button } from "../components/ui/button.jsx";
-import { Card, CardHeader } from "../components/ui/card.jsx";
+import { Card, CardHeader, CardContent } from "../components/ui/card.jsx";
 import { useToast } from "../components/ui/use-toast.jsx";
 import ConfirmDialog from "../components/ui/ConfirmDialog.jsx";
 import CamionModal from "./modals/CamionModal.jsx";
@@ -27,20 +27,23 @@ const renderDocuments = (c) => {
     { url: c.assuranceurl, label: "Assurance", expiry: c.assuranceexpiry },
     { url: c.visitetechniqueurl, label: "Visite Tech.", expiry: c.visitetechniqueexpiry },
   ];
-  docList.forEach((doc, i) => {
-    if (doc.url) {
-      const expired = doc.expiry && new Date(doc.expiry) < new Date();
+  docList.forEach(({ url, label, expiry }, i) => {
+    if (url) {
+      const expired = expiry && new Date(expiry) < new Date();
       docs.push(
-        <div key={i} className="flex items-center gap-1 text-sm">
-          <a href={doc.url} target="_blank" rel="noopener noreferrer" className={`text-blue-600 dark:text-blue-400 hover:underline ${expired ? "line-through" : ""}`}>
-            <FileText size={14} /> {doc.label}
-          </a>
-          {doc.expiry && <span className={`text-xs ${expired ? "text-red-600 dark:text-red-400" : "text-gray-500 dark:text-gray-300"}`}>({new Date(doc.expiry).toLocaleDateString()})</span>}
-        </div>
+        <a
+          key={i}
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`text-blue-600 dark:text-blue-400 hover:underline text-sm flex items-center gap-1 ${expired ? "line-through" : ""}`}
+        >
+          <FileText size={14} /> {label} {expiry && <span className="text-xs text-gray-500 dark:text-gray-300">({new Date(expiry).toLocaleDateString()})</span>}
+        </a>
       );
     }
   });
-  return docs.length ? <div className="flex flex-col gap-1">{docs}</div> : <span className="text-gray-400 italic dark:text-gray-400">Aucun</span>;
+  return docs.length ? <div className="flex flex-col gap-1 mt-1">{docs}</div> : <span className="text-gray-400 italic text-sm">Aucun document</span>;
 };
 
 export default function CamionsSection() {
@@ -125,104 +128,108 @@ export default function CamionsSection() {
       body: filteredCamions.map((c) => [c.immatriculation, c.type, c.marquemodele, c.statut, c.structure || "-", c.cartegriseurl ? "Oui" : "", c.assuranceurl ? "Oui" : "", c.visitetechniqueurl ? "Oui" : ""]),
       theme: "grid",
       styles: { fontSize: 9 },
-      headStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0] },
     });
     doc.save("liste_camions.pdf");
     toast({ title: "Export PDF", description: "Le document a été généré." });
   };
 
   return (
-    <div className="p-4 md:p-6 space-y-6 container animate-fadeInUp">
+    <div className="p-3 sm:p-6 space-y-6 container animate-fadeInUp">
       {/* Header */}
-      <Card className="shadow-xl bg-white/90 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
-        <CardHeader className="flex flex-col md:flex-row justify-between items-start md:items-center p-4 sm:p-6 gap-3 md:gap-0">
-          <h2 className="text-xl md:text-2xl font-bold text-gray-800 dark:text-gray-100 flex items-center gap-3">
+      <Card className="shadow-lg bg-white/90 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+        <CardHeader className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-800 dark:text-gray-100 flex items-center gap-3">
             <Truck size={24} className="text-blue-600 dark:text-blue-400" /> Gestion de la Flotte
           </h2>
-          <Button onClick={handleAdd} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white">
+          <Button onClick={handleAdd} className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white">
             + Créer Camion
           </Button>
         </CardHeader>
       </Card>
 
-      {/* Filtres + exports */}
-      <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between bg-white dark:bg-gray-800 p-4 rounded-xl shadow border border-gray-100 dark:border-gray-700">
-        <div className="flex flex-wrap gap-2">
-          <input type="text" placeholder="🔍 Rechercher par immatriculation..." value={searchTerm} onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }} className="w-full sm:w-64 border border-gray-300 dark:border-gray-600 rounded px-2 py-1 dark:bg-gray-700 dark:text-gray-200"/>
-          <select value={typeFilter} onChange={(e) => { setTypeFilter(e.target.value); setCurrentPage(1); }} className="border rounded px-2 py-1 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600">
-            <option value="">Tous types</option>
-            <option value="Benne">Benne</option>
-            <option value="Tracteur">Tracteur</option>
-            <option value="Remorque">Remorque</option>
-            <option value="Semi-remorque">Semi-remorque</option>
-          </select>
-          <select value={statutFilter} onChange={(e) => { setStatutFilter(e.target.value); setCurrentPage(1); }} className="border rounded px-2 py-1 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600">
-            <option value="">Tous statuts</option>
-            <option value="Disponible">Disponible</option>
-            <option value="En maintenance">En maintenance</option>
-            <option value="Indisponible">Indisponible</option>
-          </select>
-          <select value={structureFilter} onChange={(e) => { setStructureFilter(e.target.value); setCurrentPage(1); }} className="border rounded px-2 py-1 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600">
-            <option value="">Toutes structures</option>
-            <option value="GTS">GTS</option>
-            <option value="BATICOM">BATICOM</option>
-          </select>
-        </div>
-        <div className="flex gap-2 mt-2 sm:mt-0">
-          <Button onClick={exportExcel} variant="outline" className="flex items-center gap-1 border-green-500 text-green-600 hover:bg-green-50 dark:text-green-400 dark:border-green-400 dark:hover:bg-green-700/20"><File size={16} /> Excel</Button>
-          <Button onClick={exportPDF} variant="outline" className="flex items-center gap-1 border-red-500 text-red-600 hover:bg-red-50 dark:text-red-400 dark:border-red-400 dark:hover:bg-red-700/20"><FileText size={16} /> PDF</Button>
+      {/* Filtres */}
+      <div className="flex flex-wrap gap-3 items-center justify-between bg-white dark:bg-gray-800 p-4 rounded-xl shadow border border-gray-100 dark:border-gray-700">
+        <input type="text" placeholder="🔍 Rechercher..." value={searchTerm} onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }} className="flex-1 min-w-[150px] border border-gray-300 dark:border-gray-600 rounded px-2 py-1 dark:bg-gray-700 dark:text-gray-200"/>
+        <select value={typeFilter} onChange={(e) => { setTypeFilter(e.target.value); setCurrentPage(1); }} className="border rounded px-2 py-1 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600">
+          <option value="">Tous types</option>
+          <option value="Benne">Benne</option>
+          <option value="Tracteur">Tracteur</option>
+          <option value="Remorque">Remorque</option>
+          <option value="Semi-remorque">Semi-remorque</option>
+        </select>
+        <select value={statutFilter} onChange={(e) => { setStatutFilter(e.target.value); setCurrentPage(1); }} className="border rounded px-2 py-1 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600">
+          <option value="">Tous statuts</option>
+          <option value="Disponible">Disponible</option>
+          <option value="En maintenance">En maintenance</option>
+          <option value="Indisponible">Indisponible</option>
+        </select>
+        <select value={structureFilter} onChange={(e) => { setStructureFilter(e.target.value); setCurrentPage(1); }} className="border rounded px-2 py-1 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600">
+          <option value="">Toutes structures</option>
+          <option value="GTS">GTS</option>
+          <option value="BATICOM">BATICOM</option>
+        </select>
+        <div className="flex gap-2">
+          <Button onClick={exportExcel} variant="outline" className="border-green-500 text-green-600 dark:text-green-400">Excel</Button>
+          <Button onClick={exportPDF} variant="outline" className="border-red-500 text-red-600 dark:text-red-400">PDF</Button>
         </div>
       </div>
 
-      {/* Tableau responsive */}
-      <div className="overflow-x-auto bg-white dark:bg-gray-800 shadow-xl rounded-xl border border-gray-100 dark:border-gray-700">
-        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-600">
-          <thead className="bg-gray-50 dark:bg-gray-700">
-            <tr>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-200">Immatriculation</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-200">Type</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-200">Marque/Modèle</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-200">Statut</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-200 hidden lg:table-cell">Structure</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-200 hidden lg:table-cell">Documents</th>
-              <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 dark:text-gray-200">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="text-sm">
-            {paginatedCamions.length === 0 ? (
-              <tr><td colSpan={7} className="p-8 text-center text-gray-500 dark:text-gray-400">Aucun camion trouvé</td></tr>
-            ) : (
-              paginatedCamions.map((c) => (
-                <tr key={c.id} className="hover:bg-blue-50/50 dark:hover:bg-blue-900/30 transition">
-                  <td className="px-4 py-2 font-medium text-gray-700 dark:text-gray-200">{c.immatriculation}</td>
-                  <td className="px-4 py-2 text-gray-600 dark:text-gray-300">{c.type}</td>
-                  <td className="px-4 py-2 text-gray-600 dark:text-gray-300">{c.marquemodele}</td>
-                  <td className="px-4 py-2">{getStatusBadge(c.statut)}</td>
-                  <td className="px-4 py-2 hidden lg:table-cell">{c.structure || "-"}</td>
-                  <td className="px-4 py-2 hidden lg:table-cell">{renderDocuments(c)}</td>
-                  <td className="px-4 py-2 flex justify-center gap-2">
-                    <Button variant="outline" size="sm" onClick={() => handleEdit(c)}><Pencil size={16} /></Button>
-                    <Button variant="destructive" size="sm" onClick={() => { setCamionToDelete(c); setConfirmOpen(true); }}><Trash2 size={16} /></Button>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+      {/* Liste sous forme de cartes */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {paginatedCamions.length === 0 ? (
+          <p className="text-center col-span-full text-gray-500 dark:text-gray-400">Aucun camion trouvé</p>
+        ) : (
+          paginatedCamions.map((c) => (
+            <Card key={c.id} className="shadow-lg p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+              <div className="flex justify-between items-start">
+                <div>
+                  <h3 className="font-bold text-lg text-gray-800 dark:text-white flex items-center gap-2">
+                    <Truck size={18} /> {c.immatriculation}
+                  </h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-300">Type: {c.type}</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-300">Modèle: {c.marquemodele}</p>
+                  <p className="text-sm mt-1">{getStatusBadge(c.statut)}</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Structure: {c.structure || "-"}</p>
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="icon" onClick={() => handleEdit(c)}><Pencil size={16} /></Button>
+                  <Button variant="destructive" size="icon" onClick={() => { setCamionToDelete(c); setConfirmOpen(true); }}><Trash2 size={16} /></Button>
+                </div>
+              </div>
+              <div className="mt-3">{renderDocuments(c)}</div>
+            </Card>
+          ))
+        )}
       </div>
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex flex-wrap justify-center gap-2 mt-4 p-2 bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-100 dark:border-gray-700">
+        <div className="flex justify-center gap-2 mt-4">
           {Array.from({ length: totalPages }, (_, i) => (
-            <Button key={i} size="sm" variant={i + 1 === currentPage ? "default" : "outline"} onClick={() => setCurrentPage(i + 1)} className={i + 1 === currentPage ? "bg-blue-600 hover:bg-blue-700 text-white" : "border-gray-300 hover:bg-gray-100 dark:border-gray-600 dark:hover:bg-gray-700/50"}>{i + 1}</Button>
+            <Button
+              key={i}
+              size="sm"
+              variant={i + 1 === currentPage ? "default" : "outline"}
+              onClick={() => setCurrentPage(i + 1)}
+              className={i + 1 === currentPage ? "bg-blue-600 text-white" : ""}
+            >
+              {i + 1}
+            </Button>
           ))}
         </div>
       )}
 
       {/* Modals */}
       {showModal && <CamionModal editingCamion={editingCamion} setShowModal={setShowModal} fetchCamions={fetchCamions} />}
-      <ConfirmDialog open={confirmOpen} onClose={setConfirmOpen} title="Supprimer ce camion ?" description={`Êtes-vous sûr de vouloir supprimer "${camionToDelete?.immatriculation}" ?`} confirmLabel="Supprimer" confirmColor="bg-red-600 hover:bg-red-700" onConfirm={confirmDelete}/>
+      <ConfirmDialog
+        open={confirmOpen}
+        onClose={setConfirmOpen}
+        title="Supprimer ce camion ?"
+        description={`Êtes-vous sûr de vouloir supprimer "${camionToDelete?.immatriculation}" ?`}
+        confirmLabel="Supprimer"
+        confirmColor="bg-red-600 hover:bg-red-700"
+        onConfirm={confirmDelete}
+      />
     </div>
   );
 }

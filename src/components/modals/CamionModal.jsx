@@ -1,118 +1,81 @@
 import React, { useState, useEffect } from "react";
 import { supabase } from "../../config/supabaseClient.js";
 import { Button } from "../ui/button.jsx";
-import { Input } from "../ui/input.jsx";
 import { useToast } from "../ui/use-toast.jsx";
 
-export default function CamionModal({ editingCamion, setShowModal, fetchCamions }) {
+export default function CamionModal({ editingCamion = null, setShowModal, fetchCamions }) {
   const { toast } = useToast();
-  const [loading, setLoading] = useState(false);
 
   const [form, setForm] = useState({
-    immatriculation: "",
-    marquemodele: "",
-    type: "",
-    statut: "Disponible",
-    structure: "",
-    photourl: "",
-    cartegriseurl: "",
-    cartegriseexpiry: null,
-    assuranceurl: "",
-    assuranceexpiry: null,
-    visitetechniqueurl: "",
-    visitetechniqueexpiry: null,
+    immatriculation: editingCamion?.immatriculation || "",
+    marquemodele: editingCamion?.marquemodele || "",
+    type: editingCamion?.type || "",
+    statut: editingCamion?.statut || "Disponible",
+    structure: editingCamion?.structure || "",
+    photourl: editingCamion?.photourl || "",
+    cartegriseurl: editingCamion?.cartegriseurl || "",
+    cartegriseexpiry: editingCamion?.cartegriseexpiry || "",
+    assuranceurl: editingCamion?.assuranceurl || "",
+    assuranceexpiry: editingCamion?.assuranceexpiry || "",
+    visitetechniqueurl: editingCamion?.visitetechniqueurl || "",
+    visitetechniqueexpiry: editingCamion?.visitetechniqueexpiry || "",
   });
 
-  // Pré-remplissage si édition
-  useEffect(() => {
-    if (editingCamion) {
-      setForm({
-        immatriculation: editingCamion.immatriculation || "",
-        marquemodele: editingCamion.marquemodele || "",
-        type: editingCamion.type || "",
-        statut: editingCamion.statut || "Disponible",
-        structure: editingCamion.structure || "",
-        photourl: editingCamion.photourl || "",
-        cartegriseurl: editingCamion.cartegriseurl || "",
-        cartegriseexpiry: editingCamion.cartegriseexpiry || null,
-        assuranceurl: editingCamion.assuranceurl || "",
-        assuranceexpiry: editingCamion.assuranceexpiry || null,
-        visitetechniqueurl: editingCamion.visitetechniqueurl || "",
-        visitetechniqueexpiry: editingCamion.visitetechniqueexpiry || null,
-      });
-    }
-  }, [editingCamion]);
+  const [loading, setLoading] = useState(false);
 
-  // Gestion des champs texte / select / date
   const handleChange = (e) => {
-    const { name, value } = e.target;
-    setForm((f) => ({ ...f, [name]: value }));
-  };
-
-  // Upload fichiers vers Supabase
-  const handleFileUpload = async (e, fieldName) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    const filePath = `${fieldName}/${Date.now()}_${file.name}`;
-    const { error: uploadError } = await supabase.storage
-      .from("uploads")
-      .upload(filePath, file, { cacheControl: "3600", upsert: true });
-
-    if (uploadError) {
-      toast({ title: "Erreur Upload", description: uploadError.message, variant: "destructive" });
-      return;
-    }
-
-    const { data: publicUrlData } = supabase.storage.from("uploads").getPublicUrl(filePath);
-    if (publicUrlData?.publicUrl) {
-      setForm((prev) => ({ ...prev, [fieldName]: publicUrlData.publicUrl }));
-      toast({ title: "Fichier uploadé ✅", description: `Document ${fieldName} ajouté.` });
+    const { name, value, files } = e.target;
+    if (files?.length) {
+      uploadFile(name, files[0]);
+    } else {
+      setForm((f) => ({ ...f, [name]: value }));
     }
   };
 
-  // Enregistrement / mise à jour camion
+  const uploadFile = async (field, file) => {
+    try {
+      const ext = file.name.split(".").pop();
+      const filePath = `${field}/${Date.now()}.${ext}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("uploads")
+        .upload(filePath, file, { upsert: true });
+      if (uploadError) throw uploadError;
+
+      const { data } = supabase.storage.from("uploads").getPublicUrl(filePath);
+      const publicUrl = data.publicUrl;
+
+      setForm((f) => ({ ...f, [field]: publicUrl }));
+      toast({ title: "✅ Fichier ajouté", description: `${file.name} téléchargé.` });
+    } catch (err) {
+      toast({ title: "⚠️ Erreur d’upload", description: err.message, variant: "destructive" });
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setLoading(true);
 
     if (!form.immatriculation || !form.marquemodele || !form.type || !form.structure) {
-      toast({
-        title: "Champs manquants",
-        description: "Veuillez remplir tous les champs obligatoires.",
-        variant: "destructive",
-      });
+      toast({ title: "Champs manquants", description: "Veuillez remplir tous les champs obligatoires.", variant: "destructive" });
+      setLoading(false);
       return;
     }
 
-    setLoading(true);
-
-    const payload = {
-      immatriculation: form.immatriculation,
-      marquemodele: form.marquemodele,
-      type: form.type,
-      statut: form.statut,
-      structure: form.structure,
-      photourl: form.photourl || null,
-      cartegriseurl: form.cartegriseurl || null,
-      cartegriseexpiry: form.cartegriseexpiry || null,
-      assuranceurl: form.assuranceurl || null,
-      assuranceexpiry: form.assuranceexpiry || null,
-      visitetechniqueurl: form.visitetechniqueurl || null,
-      visitetechniqueexpiry: form.visitetechniqueexpiry || null,
-    };
+    const payload = { ...form };
 
     try {
       if (editingCamion) {
         const { error } = await supabase.from("camions").update(payload).eq("id", editingCamion.id);
         if (error) throw error;
-        toast({ title: "Camion mis à jour ✅" });
+        toast({ title: "✅ Camion mis à jour" });
       } else {
         const { error } = await supabase.from("camions").insert([payload]);
         if (error) throw error;
-        toast({ title: "Camion ajouté ✅" });
+        toast({ title: "✅ Camion ajouté" });
       }
 
-      fetchCamions();
+      fetchCamions?.();
       setShowModal(false);
     } catch (err) {
       toast({ title: "Erreur", description: err.message, variant: "destructive" });
@@ -122,68 +85,64 @@ export default function CamionModal({ editingCamion, setShowModal, fetchCamions 
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl p-6 overflow-y-auto max-h-[90vh]">
-        <h2 className="text-xl font-semibold mb-4 text-gray-800">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-2 sm:p-0">
+      <div className="bg-white dark:bg-gray-800 p-4 sm:p-6 rounded-2xl shadow-xl w-full max-w-lg h-[90vh] sm:h-auto overflow-y-auto animate-in fade-in zoom-in">
+        <h2 className="text-xl sm:text-2xl font-bold text-gray-800 dark:text-gray-100 mb-4 text-center">
           {editingCamion ? "Modifier le Camion" : "Créer un Camion"}
         </h2>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <Input name="immatriculation" placeholder="Immatriculation *" value={form.immatriculation} onChange={handleChange} />
-            <Input name="marquemodele" placeholder="Marque / Modèle *" value={form.marquemodele} onChange={handleChange} />
-            <select name="type" value={form.type} onChange={handleChange} className="border rounded px-2 py-2 w-full">
-              <option value="">-- Sélectionner le type --</option>
-              <option value="Benne">Benne</option>
-              <option value="Tracteur">Tracteur</option>
-              <option value="Semi-remorque">Semi-remorque</option>
-              <option value="Remorque">Remorque</option>
-            </select>
-            <select name="statut" value={form.statut} onChange={handleChange} className="border rounded px-2 py-2 w-full">
-              <option value="Disponible">Disponible</option>
-              <option value="En maintenance">En maintenance</option>
-              <option value="Indisponible">Indisponible</option>
-            </select>
+        <form onSubmit={handleSubmit} className="space-y-3">
+          {/* Champs principaux */}
+          <input name="immatriculation" placeholder="Immatriculation *" value={form.immatriculation} onChange={handleChange} className="border border-gray-300 dark:border-gray-600 p-3 w-full rounded-md bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200" required />
+          <input name="marquemodele" placeholder="Marque / Modèle *" value={form.marquemodele} onChange={handleChange} className="border border-gray-300 dark:border-gray-600 p-3 w-full rounded-md bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200" required />
 
-            {/* Structure */}
-            <select name="structure" value={form.structure} onChange={handleChange} className="border rounded px-2 py-2 w-full">
-              <option value="">-- Affecter à --</option>
-              <option value="GTS">GTS</option>
-              <option value="BATICOM">BATICOM</option>
-            </select>
+          <select name="type" value={form.type} onChange={handleChange} className="border border-gray-300 dark:border-gray-600 p-3 w-full rounded-md bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200" required>
+            <option value="">-- Sélectionner le type --</option>
+            <option value="Benne">Benne</option>
+            <option value="Tracteur">Tracteur</option>
+            <option value="Semi-remorque">Semi-remorque</option>
+            <option value="Remorque">Remorque</option>
+          </select>
+
+          <select name="statut" value={form.statut} onChange={handleChange} className="border border-gray-300 dark:border-gray-600 p-3 w-full rounded-md bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200">
+            <option value="Disponible">Disponible</option>
+            <option value="En maintenance">En maintenance</option>
+            <option value="Indisponible">Indisponible</option>
+          </select>
+
+          <select name="structure" value={form.structure} onChange={handleChange} className="border border-gray-300 dark:border-gray-600 p-3 w-full rounded-md bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200" required>
+            <option value="">-- Affecter à --</option>
+            <option value="GTS">GTS</option>
+            <option value="BATICOM">BATICOM</option>
+          </select>
+
+          {/* Upload photo et documents */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+            {[
+              { field: "photourl", label: "Photo" },
+              { field: "cartegriseurl", label: "Carte Grise", exp: "cartegriseexpiry" },
+              { field: "assuranceurl", label: "Assurance", exp: "assuranceexpiry" },
+              { field: "visitetechniqueurl", label: "Visite Technique", exp: "visitetechniqueexpiry" },
+            ].map(({ field, label, exp }) => (
+              <div key={field}>
+                <label className="text-sm text-gray-700 dark:text-gray-200 block mb-1">{label} :</label>
+                <input type="file" name={field} onChange={handleChange} className="w-full" />
+                {form[field] && (
+                  <a href={form[field]} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 text-xs mt-1 block">
+                    Voir fichier
+                  </a>
+                )}
+                {exp && (
+                  <input type="date" name={exp} value={form[exp] || ""} onChange={handleChange} className="border border-gray-300 dark:border-gray-600 p-2 w-full rounded mt-1 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200" />
+                )}
+              </div>
+            ))}
           </div>
 
-          {/* Photo et documents */}
-          <hr className="my-3" />
-          <h3 className="text-sm font-semibold text-gray-700">🖼️ Photo du camion</h3>
-          <input type="file" accept="image/*" onChange={(e) => handleFileUpload(e, "photourl")} className="block text-sm text-gray-600" />
-          {form.photourl && <img src={form.photourl} alt="Camion" className="w-32 h-20 object-cover rounded mt-2 border" />}
-
-          <hr className="my-3" />
-          <h3 className="text-sm font-semibold text-gray-700">📄 Documents & Dates d'expiration</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="text-xs text-gray-500">Carte Grise</label>
-              <input type="file" onChange={(e) => handleFileUpload(e, "cartegriseurl")} />
-              <Input type="date" name="cartegriseexpiry" value={form.cartegriseexpiry || ""} onChange={handleChange} className="mt-1" />
-            </div>
-            <div>
-              <label className="text-xs text-gray-500">Assurance</label>
-              <input type="file" onChange={(e) => handleFileUpload(e, "assuranceurl")} />
-              <Input type="date" name="assuranceexpiry" value={form.assuranceexpiry || ""} onChange={handleChange} className="mt-1" />
-            </div>
-            <div>
-              <label className="text-xs text-gray-500">Visite Technique</label>
-              <input type="file" onChange={(e) => handleFileUpload(e, "visitetechniqueurl")} />
-              <Input type="date" name="visitetechniqueexpiry" value={form.visitetechniqueexpiry || ""} onChange={handleChange} className="mt-1" />
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-2 mt-6">
-            <Button type="button" variant="outline" onClick={() => setShowModal(false)} className="border-gray-300 hover:bg-gray-100">Annuler</Button>
-            <Button type="submit" disabled={loading} className="bg-blue-600 hover:bg-blue-700 text-white">
-              {loading ? "Enregistrement..." : editingCamion ? "Mettre à jour" : "Créer"}
-            </Button>
+          {/* Footer boutons */}
+          <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4 sticky bottom-0 bg-white dark:bg-gray-800 pb-2">
+            <Button variant="outline" type="button" onClick={() => setShowModal(false)} className="border-gray-400 w-full sm:w-auto">Annuler</Button>
+            <Button type="submit" disabled={loading} className="bg-blue-600 text-white hover:bg-blue-700 w-full sm:w-auto">{loading ? "Enregistrement..." : editingCamion ? "Mettre à jour" : "Créer"}</Button>
           </div>
         </form>
       </div>
