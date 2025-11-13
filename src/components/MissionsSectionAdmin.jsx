@@ -1,7 +1,7 @@
 // src/components/MissionsSectionAdmin.jsx
 import React, { useState } from "react";
 import MissionsSectionBaticom from "./MissionsSectionBaticom.jsx";
-import MissionsSectionGTS from "./MissionsSectionGTS.jsx"; 
+import MissionsSectionGTS from "./MissionsSectionGts.jsx"; 
 import { Button } from "./ui/button.jsx";
 
 export default function MissionsSectionAdmin() {
