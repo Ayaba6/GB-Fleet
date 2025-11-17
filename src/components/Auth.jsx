@@ -7,7 +7,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Moon, Sun, Loader2 } from 'lucide-react';
 
-// Toggle Dark Mode
+// Toggle Mode Sombre
 const DarkModeToggle = ({ darkMode, setDarkMode }) => (
   <button
     onClick={() => setDarkMode(!darkMode)}
@@ -25,18 +25,14 @@ export default function AuthPage() {
   const [error, setError] = useState(null);
   const navigate = useNavigate();
 
-  // Session listener global
   useEffect(() => {
     document.documentElement.classList.toggle('dark', darkMode);
-
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
     });
-
     return () => listener?.subscription.unsubscribe();
   }, [darkMode]);
 
-  // Vérification du profil et redirection
   const verifyProfile = useCallback(async (session) => {
     try {
       setLoadingProfile(true);
@@ -45,7 +41,6 @@ export default function AuthPage() {
       if (error || !data) { setError("Profil introuvable."); await supabase.auth.signOut(); return; }
       if (!data.active) { setError("Compte désactivé."); await supabase.auth.signOut(); return; }
 
-      // Redirection selon rôle
       switch (data.role) {
         case 'admin': navigate('/dashboard'); break;
         case 'superviseur': navigate('/missions'); break;
@@ -70,8 +65,8 @@ export default function AuthPage() {
         <div className="w-full max-w-md bg-white dark:bg-gray-800 p-8 sm:p-10 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700/50 transition-all duration-300 animate-fadeInUp">
           <div className="flex flex-col items-center mb-8">
             <img src={Logo} alt="GB-Fleet Logo" className="h-16 w-16 mb-4 animate-pulse-slow"/>
-            <h1 className="text-3xl font-extrabold text-gray-800 dark:text-gray-100 text-center">Connexion GB-Fleet</h1>
-            <p className="text-gray-500 dark:text-gray-400 mt-2 text-center text-sm">Accédez à votre portail professionnel</p>
+            <h1 className="text-3xl font-extrabold text-gray-800 dark:text-gray-100 text-center">Connexion Sécurisée</h1>
+            <p className="text-gray-500 dark:text-gray-400 mt-2 text-center text-sm">Seuls les comptes autorisés par l’administrateur peuvent se connecter</p>
           </div>
 
           {error && <div className="mb-6 p-4 rounded-lg bg-red-100 dark:bg-red-800 text-red-700 dark:text-red-100 text-sm font-medium text-center border border-red-300 dark:border-red-700" role="alert">{error}</div>}
@@ -79,11 +74,32 @@ export default function AuthPage() {
           {!session && (
             <Auth
               supabaseClient={supabase}
-              appearance={{ theme: ThemeSupa, style: { input: { borderColor: 'hsl(210 20% 90%)', padding: '0.75rem', transition:'border-color 0.2s' } } }}
-              localization={{ variables: { sign_in:{ email_label:"Adresse Email", password_label:"Mot de Passe", button_label:"Se Connecter" }}}}
+              appearance={{
+                theme: ThemeSupa,
+                style: {
+                  button: { backgroundColor: '#1D4ED8', color: 'white', fontWeight: 'bold', borderRadius: '0.5rem', padding: '0.75rem' },
+                  input: { borderColor: 'hsl(210 20% 90%)', padding: '0.75rem', transition:'border-color 0.2s' }
+                }
+              }}
+              localization={{
+                variables: {
+                  sign_in: {
+                    email_label: "Adresse Email",
+                    password_label: "Mot de Passe",
+                    button_label: "Se Connecter"
+                  },
+                  forgotten_password: {
+                    email_label: "Adresse Email",
+                    password_label: "Nouveau Mot de Passe",
+                    button_label: "Réinitialiser le mot de passe",
+                    link_text: "Mot de passe oublié ?"
+                  },
+                  social_provider_text: "",
+                  sign_up: { link_text: "" } // supprime lien création compte
+                }
+              }}
               providers={[]}
               view="sign_in"
-              // ✅ Nouveau : callback après login
               onSignIn={async (data) => {
                 if (data?.session) {
                   await verifyProfile(data.session);
