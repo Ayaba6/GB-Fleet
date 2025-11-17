@@ -29,17 +29,20 @@
 .animate-scalePulse { animation: scalePulse 1.2s ease-in-out infinite; }
 
 /* ======================================================= */
-/* ====== 2. RESET ET BASE ====== */
+/* ====== 2. RESET ET BASE (Simplifié) ====== */
 /* ======================================================= */
-* { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
+/* Tailwind Preflight (base) gère déjà margin, padding, et box-sizing */
+* { font-family: 'Inter', sans-serif; }
+
+/* Supprimé : .container car il limitait la largeur du dashboard */
+
 body { background: #f3f4f6; color: #1f2937; line-height: 1.6; }
 
-/* Conteneur global */
-.container { max-width: 1200px; margin: 0 auto; padding: 1rem; }
 
 /* ======================================================= */
-/* ====== 3. DARK MODE ====== */
+/* ====== 3. DARK MODE (Règles spécifiques non-Tailwind) ====== */
 /* ======================================================= */
+/* Attention : Ces règles CSS brutes peuvent être prioritaires sur les classes dark: de Tailwind */
 body.dark {
   background-color: #111827;
   color: #f3f4f6;
@@ -54,7 +57,8 @@ body.dark textarea {
 }
 
 body.dark button {
-  background-color: #374151;
+  /* Cette règle peut être trop générique et casser des boutons spécifiques */
+  /* background-color: #374151; */ 
   color: #f3f4f6;
 }
 
