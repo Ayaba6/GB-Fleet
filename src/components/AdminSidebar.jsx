@@ -40,10 +40,17 @@ export default function AdminSidebar({
           ${menuOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}
       >
         
-        {/* Barre mobile avec bouton fermer */}
+        {/* Barre mobile avec bouton fermer (Style semi-transparent appliqué) */}
         <div className="flex justify-end px-4 py-4 border-b border-gray-200 dark:border-gray-700 md:hidden">
           <button
-            className="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700"
+            className={`
+              p-2 rounded-lg 
+              // Style semi-transparent et flou
+              bg-white/70 dark:bg-gray-800/70 
+              backdrop-blur-sm shadow-sm
+              hover:bg-gray-200 dark:hover:bg-gray-700
+              transition-colors
+            `}
             onClick={() => setMenuOpen(false)}
           >
             <X className="w-6 h-6 text-gray-800 dark:text-gray-200" />
@@ -82,7 +89,7 @@ export default function AdminSidebar({
                   ${
                     active 
                       ? "bg-gradient-to-r from-blue-600 to-indigo-700 text-white shadow-lg shadow-blue-500/50" 
-                      : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 hover:scale-[1.02] bg-white dark:bg-gray-900" // Correction du mode sombre ici
+                      : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 hover:scale-[1.02] bg-white dark:bg-gray-900" 
                   }`}
               >
                 <Icon className={`w-5 h-5 mr-3 ${active ? "text-white" : "text-blue-600 dark:text-blue-400"}`} />
