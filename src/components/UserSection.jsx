@@ -1,4 +1,3 @@
-// src/components/UserSection.jsx
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../config/supabaseClient.js";
 import { Button } from "../components/ui/button.jsx";
@@ -6,14 +5,15 @@ import { Card, CardHeader, CardContent } from "../components/ui/card.jsx";
 import { useToast } from "../components/ui/use-toast.jsx";
 import ConfirmDialog from "../components/ui/ConfirmDialog.jsx";
 import UserModal from "./modals/UserModal.jsx";
-import { Pencil, Trash2, Users, FileText, File, Phone, Mail, User, Calendar } from "lucide-react";
+import { Pencil, Trash2, Users, FileText, User, Mail, Phone, Calendar } from "lucide-react";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
+// --- Documents utilisateur ---
 const renderDocuments = (u) => {
   const docs = [];
-  const addDoc = (url, label) => {
+  const addDoc = (url, label, expiry) => {
     if (url)
       docs.push(
         <a
@@ -23,21 +23,15 @@ const renderDocuments = (u) => {
           rel="noopener noreferrer"
           className="text-blue-600 dark:text-blue-400 hover:underline text-sm flex items-center gap-1"
         >
-          <FileText size={14} /> {label}
+          <FileText size={14} /> {label} {expiry && <span className="text-xs text-gray-500 dark:text-gray-300">({new Date(expiry).toLocaleDateString()})</span>}
         </a>
       );
   };
-
-  addDoc(u.cniburl, "CNIB");
-  addDoc(u.permisurl, "Permis");
-  addDoc(u.carteurl, "Carte");
-  addDoc(u.actenaissanceurl, "Acte de naissance");
-
-  return docs.length ? (
-    <div className="flex flex-col gap-1 mt-1">{docs}</div>
-  ) : (
-    <span className="text-gray-400 italic text-sm">Aucun document</span>
-  );
+  addDoc(u.cniburl, "CNIB", u.cnibexpiry);
+  addDoc(u.permisurl, "Permis", u.permisexpiry);
+  addDoc(u.carteurl, "Carte", u.carteexpiry);
+  addDoc(u.actenaissanceurl, "Acte de naissance", u.actenaissanceexpiry);
+  return docs.length ? <div className="flex flex-col gap-1 mt-1">{docs}</div> : <span className="text-gray-400 italic text-sm">Aucun document</span>;
 };
 
 export default function UserSection() {
@@ -54,12 +48,8 @@ export default function UserSection() {
   const ITEMS_PER_PAGE = 5;
 
   const fetchUsers = useCallback(async () => {
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("*")
-      .order("created_at", { ascending: false });
-    if (error)
-      toast({ title: "Erreur de chargement", description: error.message, variant: "destructive" });
+    const { data, error } = await supabase.from("profiles").select("*").order("created_at", { ascending: false });
+    if (error) toast({ title: "Erreur de chargement", description: error.message, variant: "destructive" });
     else setUsers(data || []);
   }, [toast]);
 
@@ -127,8 +117,8 @@ export default function UserSection() {
 
   return (
     <div className="p-3 sm:p-6 space-y-6 container animate-fadeInUp">
-      {/* En-tête */}
-      <Card className="shadow-lg bg-white/90 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+      {/* Header */}
+      <Card className="shadow-lg bg-white/80 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 backdrop-blur-sm">
         <CardHeader className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
           <h2 className="text-xl sm:text-2xl font-bold text-gray-800 dark:text-gray-100 flex items-center gap-3">
             <Users size={24} className="text-blue-600 dark:text-blue-400" /> Gestion des utilisateurs
@@ -140,18 +130,18 @@ export default function UserSection() {
       </Card>
 
       {/* Filtres */}
-      <div className="flex flex-wrap gap-3 items-center justify-between bg-white dark:bg-gray-800 p-4 rounded-xl shadow border border-gray-100 dark:border-gray-700">
+      <div className="flex flex-wrap gap-3 items-center justify-between bg-white/80 dark:bg-gray-800/80 p-4 rounded-xl shadow border border-gray-100 dark:border-gray-700 backdrop-blur-sm">
         <input
           type="text"
           placeholder="🔍 Rechercher..."
           value={searchTerm}
           onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-          className="flex-1 min-w-[150px] border border-gray-300 dark:border-gray-600 rounded px-2 py-1 dark:bg-gray-700 dark:text-gray-200"
+          className="flex-1 min-w-[150px] border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-200"
         />
         <select
           value={roleFilter}
           onChange={(e) => { setRoleFilter(e.target.value); setCurrentPage(1); }}
-          className="border rounded px-2 py-1 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600"
+          className="border rounded px-2 py-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-200 border-gray-300 dark:border-gray-600"
         >
           <option value="">Tous rôles</option>
           <option value="chauffeur">Chauffeur</option>
@@ -161,7 +151,7 @@ export default function UserSection() {
         <select
           value={structureFilter}
           onChange={(e) => { setStructureFilter(e.target.value); setCurrentPage(1); }}
-          className="border rounded px-2 py-1 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600"
+          className="border rounded px-2 py-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-200 border-gray-300 dark:border-gray-600"
         >
           <option value="">Toutes structures</option>
           <option value="GTS">GTS</option>
@@ -174,13 +164,13 @@ export default function UserSection() {
         </div>
       </div>
 
-      {/* Liste sous forme de cartes */}
+      {/* Liste utilisateurs */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {paginatedUsers.length === 0 ? (
           <p className="text-center col-span-full text-gray-500 dark:text-gray-400">Aucun utilisateur trouvé</p>
         ) : (
           paginatedUsers.map((u) => (
-            <Card key={u.id} className="shadow-lg p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+            <Card key={u.id} className="shadow-lg p-4 bg-white/70 dark:bg-gray-800/70 border border-gray-200 dark:border-gray-700 backdrop-blur-sm">
               <div className="flex justify-between items-start">
                 <div>
                   <h3 className="font-bold text-lg text-gray-800 dark:text-white flex items-center gap-2">
@@ -193,8 +183,12 @@ export default function UserSection() {
                   </p>
                 </div>
                 <div className="flex gap-2">
-                  <Button variant="outline" size="icon" onClick={() => handleEdit(u)}><Pencil size={16} /></Button>
-                  <Button variant="destructive" size="icon" onClick={() => { setUserToDelete(u); setConfirmOpen(true); }}><Trash2 size={16} /></Button>
+                  <Button variant="outline" size="icon" onClick={() => handleEdit(u)} className="bg-white/50 dark:bg-gray-700/50 hover:bg-white/70 dark:hover:bg-gray-600/60 transition">
+                    <Pencil size={16} className="text-gray-800 dark:text-gray-200 opacity-80 hover:opacity-100 transition" />
+                  </Button>
+                  <Button variant="destructive" size="icon" onClick={() => { setUserToDelete(u); setConfirmOpen(true); }} className="bg-white/50 dark:bg-gray-700/50 hover:bg-white/70 dark:hover:bg-gray-600/60 transition">
+                    <Trash2 size={16} className="text-red-600 dark:text-red-400 opacity-80 hover:opacity-100 transition" />
+                  </Button>
                 </div>
               </div>
 

@@ -6,7 +6,7 @@ import { Card, CardHeader, CardContent } from "../components/ui/card.jsx";
 import { useToast } from "../components/ui/use-toast.jsx";
 import ConfirmDialog from "../components/ui/ConfirmDialog.jsx";
 import CamionModal from "./modals/CamionModal.jsx";
-import { Pencil, Trash2, Truck, FileText, File } from "lucide-react";
+import { Pencil, Trash2, Truck, FileText } from "lucide-react";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -17,7 +17,11 @@ const getStatusBadge = (statut) => {
     "En maintenance": "bg-yellow-100 text-yellow-800 dark:bg-yellow-800 dark:text-yellow-100",
     Indisponible: "bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100",
   };
-  return <span className={`px-2 py-1 text-xs font-semibold rounded-full capitalize ${colors[statut] || "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200"}`}>{statut}</span>;
+  return (
+    <span className={`px-2 py-1 text-xs font-semibold rounded-full capitalize ${colors[statut] || "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200"}`}>
+      {statut}
+    </span>
+  );
 };
 
 const renderDocuments = (c) => {
@@ -136,7 +140,7 @@ export default function CamionsSection() {
   return (
     <div className="p-3 sm:p-6 space-y-6 container animate-fadeInUp">
       {/* Header */}
-      <Card className="shadow-lg bg-white/90 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+      <Card className="shadow-lg bg-white/80 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 backdrop-blur-sm">
         <CardHeader className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
           <h2 className="text-xl sm:text-2xl font-bold text-gray-800 dark:text-gray-100 flex items-center gap-3">
             <Truck size={24} className="text-blue-600 dark:text-blue-400" /> Gestion de la Flotte
@@ -148,39 +152,61 @@ export default function CamionsSection() {
       </Card>
 
       {/* Filtres */}
-      <div className="flex flex-wrap gap-3 items-center justify-between bg-white dark:bg-gray-800 p-4 rounded-xl shadow border border-gray-100 dark:border-gray-700">
-        <input type="text" placeholder="🔍 Rechercher..." value={searchTerm} onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }} className="flex-1 min-w-[150px] border border-gray-300 dark:border-gray-600 rounded px-2 py-1 dark:bg-gray-700 dark:text-gray-200"/>
-        <select value={typeFilter} onChange={(e) => { setTypeFilter(e.target.value); setCurrentPage(1); }} className="border rounded px-2 py-1 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600">
+      <div className="flex flex-wrap gap-3 items-center justify-between bg-white/80 dark:bg-gray-800/80 p-4 rounded-xl shadow border border-gray-100 dark:border-gray-700 backdrop-blur-sm">
+        <input
+          type="text"
+          placeholder="🔍 Rechercher..."
+          value={searchTerm}
+          onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+          className="flex-1 min-w-[150px] border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white text-gray-800 dark:bg-gray-700 dark:text-gray-200"
+        />
+
+        <select
+          value={typeFilter}
+          onChange={(e) => { setTypeFilter(e.target.value); setCurrentPage(1); }}
+          className="border rounded px-2 py-1 bg-white text-gray-800 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600"
+        >
           <option value="">Tous types</option>
           <option value="Benne">Benne</option>
           <option value="Tracteur">Tracteur</option>
           <option value="Remorque">Remorque</option>
           <option value="Semi-remorque">Semi-remorque</option>
         </select>
-        <select value={statutFilter} onChange={(e) => { setStatutFilter(e.target.value); setCurrentPage(1); }} className="border rounded px-2 py-1 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600">
+
+        <select
+          value={statutFilter}
+          onChange={(e) => { setStatutFilter(e.target.value); setCurrentPage(1); }}
+          className="border rounded px-2 py-1 bg-white text-gray-800 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600"
+        >
           <option value="">Tous statuts</option>
           <option value="Disponible">Disponible</option>
           <option value="En maintenance">En maintenance</option>
           <option value="Indisponible">Indisponible</option>
         </select>
-        <select value={structureFilter} onChange={(e) => { setStructureFilter(e.target.value); setCurrentPage(1); }} className="border rounded px-2 py-1 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600">
+
+        <select
+          value={structureFilter}
+          onChange={(e) => { setStructureFilter(e.target.value); setCurrentPage(1); }}
+          className="border rounded px-2 py-1 bg-white text-gray-800 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600"
+        >
           <option value="">Toutes structures</option>
           <option value="GTS">GTS</option>
           <option value="BATICOM">BATICOM</option>
         </select>
+
         <div className="flex gap-2">
           <Button onClick={exportExcel} variant="outline" className="border-green-500 text-green-600 dark:text-green-400">Excel</Button>
           <Button onClick={exportPDF} variant="outline" className="border-red-500 text-red-600 dark:text-red-400">PDF</Button>
         </div>
       </div>
 
-      {/* Liste sous forme de cartes */}
+      {/* Liste des cartes */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {paginatedCamions.length === 0 ? (
           <p className="text-center col-span-full text-gray-500 dark:text-gray-400">Aucun camion trouvé</p>
         ) : (
           paginatedCamions.map((c) => (
-            <Card key={c.id} className="shadow-lg p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+            <Card key={c.id} className="shadow-lg p-4 bg-white/70 dark:bg-gray-800/70 border border-gray-200 dark:border-gray-700 backdrop-blur-sm">
               <div className="flex justify-between items-start">
                 <div>
                   <h3 className="font-bold text-lg text-gray-800 dark:text-white flex items-center gap-2">
@@ -192,8 +218,12 @@ export default function CamionsSection() {
                   <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Structure: {c.structure || "-"}</p>
                 </div>
                 <div className="flex gap-2">
-                  <Button variant="outline" size="icon" onClick={() => handleEdit(c)}><Pencil size={16} /></Button>
-                  <Button variant="destructive" size="icon" onClick={() => { setCamionToDelete(c); setConfirmOpen(true); }}><Trash2 size={16} /></Button>
+                  <Button variant="outline" size="icon" onClick={() => handleEdit(c)} className="bg-white/50 dark:bg-gray-700/50 hover:bg-white/70 dark:hover:bg-gray-600/60 transition">
+                    <Pencil size={16} className="text-gray-800 dark:text-gray-200 opacity-80 hover:opacity-100 transition" />
+                  </Button>
+                  <Button variant="destructive" size="icon" onClick={() => { setCamionToDelete(c); setConfirmOpen(true); }} className="bg-white/50 dark:bg-gray-700/50 hover:bg-white/70 dark:hover:bg-gray-600/60 transition">
+                    <Trash2 size={16} className="text-red-600 dark:text-red-400 opacity-80 hover:opacity-100 transition" />
+                  </Button>
                 </div>
               </div>
               <div className="mt-3">{renderDocuments(c)}</div>

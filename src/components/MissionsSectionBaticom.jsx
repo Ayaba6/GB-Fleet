@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "../config/supabaseClient.js";
 import { Button } from "../components/ui/button.jsx";
-import { Card, CardHeader, CardContent } from "../components/ui/card.jsx";
+import { Card, CardHeader } from "../components/ui/card.jsx";
 import { Pencil, Lock, Eye, Loader2 } from "lucide-react";
 import OpenDayModalBaticom from "./modals/OpenDayModalBaticom.jsx";
 import EditDayModalBaticom from "./modals/EditDayModalBaticom.jsx";
@@ -11,7 +11,7 @@ const ITEMS_PER_PAGE = 5;
 const STRUCTURE = "BATICOM";
 const STATUS_CLOSED = "clôturée";
 
-// Composant Card pour les journées (responsive et dark)
+// Card pour les journées
 const CardJournee = ({ journee, chauffeur, camion, onEdit, onClose, onView }) => {
   const isClosed = journee.statut === STATUS_CLOSED;
 
@@ -106,7 +106,6 @@ export default function MissionsSectionBaticom() {
   const handleConfirmClose = (id) => { setSelectedJourneeId(id); setConfirmOpen(true); };
   const confirmClose = async () => { await handleCloseJournee(selectedJourneeId); setConfirmOpen(false); setSelectedJourneeId(null); };
 
-  // Filtrage + pagination
   const { paginatedJournees, totalPages } = useMemo(() => {
     const filtered = journees.filter((j) => {
       const chauffeur = chauffeurs.find(c => c.id === j.chauffeur_id);
@@ -125,7 +124,9 @@ export default function MissionsSectionBaticom() {
   }, [journees, chauffeurs, camions, searchTerm, sortOrder, currentPage]);
 
   return (
-    <div className="p-4 md:p-6 space-y-6 bg-gray-50 dark:bg-gray-900 min-h-screen">
+    <div className="flex-1 flex flex-col space-y-6 px-4 md:px-6 py-6 animate-fadeInUp">
+
+      {/* Card ouverture journée */}
       <Card className="shadow-xl bg-white/90 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
         <CardHeader className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 sm:p-6 gap-3">
           <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-4 sm:mb-0">Journées {STRUCTURE}</h2>
@@ -145,7 +146,7 @@ export default function MissionsSectionBaticom() {
         {isLoading && <Loader2 className="animate-spin text-blue-500" size={24} />}
       </div>
 
-      {/* Card view pour mobile */}
+      {/* Card view */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {isLoading ? Array.from({ length: ITEMS_PER_PAGE }).map((_,i) => (
           <Card key={i} className="p-4 animate-pulse bg-gray-100 dark:bg-gray-700 h-40" />
@@ -163,7 +164,7 @@ export default function MissionsSectionBaticom() {
         <div className="flex flex-wrap justify-center gap-2 mt-4 p-2 bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-100 dark:border-gray-700">
           {Array.from({ length: totalPages }, (_, i) => (
             <Button key={i} size="sm" variant={i+1===currentPage?"default":"outline"} onClick={()=>setCurrentPage(i+1)}
-              className={i+1===currentPage?"bg-blue-600 hover:bg-blue-700 text-white dark:bg-blue-500 dark:hover:bg-blue-600":"border-gray-300 hover:bg-gray-100 dark:border-gray-600 dark:hover:bg-gray-700/50"}>
+              className={i+1===currentPage?"bg-blue-600 hover:bg-blue-700 text-white dark:bg-blue-500 dark:hover:bg-blue-600":""}>
               {i+1}
             </Button>
           ))}

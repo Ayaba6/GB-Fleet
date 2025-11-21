@@ -1,4 +1,3 @@
-// src/components/CarteFlotte.js
 import React, { useEffect, useState, useMemo } from "react";
 import { MapContainer, TileLayer, Marker, Polyline, Tooltip, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
@@ -17,9 +16,7 @@ const chauffeurIcon = new L.Icon({
 function RecenterMap({ position }) {
   const map = useMap();
   useEffect(() => {
-    if (position) {
-      map.setView(position, 13, { animate: true });
-    }
+    if (position) map.setView(position, 13, { animate: true });
   }, [position, map]);
   return null;
 }
@@ -33,7 +30,6 @@ export default function CarteFlotte() {
   const [filterCamion, setFilterCamion] = useState("");
   const [centerPosition, setCenterPosition] = useState([12.3711, -1.5197]);
 
-  // --- Récupérer missions, positions, chauffeurs et camions ---
   useEffect(() => {
     const fetchMissions = async () => {
       const { data, error } = await supabase
@@ -75,7 +71,6 @@ export default function CarteFlotte() {
     return () => clearInterval(interval);
   }, []);
 
-  // --- Filtrer missions ---
   const filteredMissions = useMemo(() => {
     return missions.filter(m => {
       const matchChauffeur = filterChauffeur ? m.chauffeur_id === filterChauffeur : true;
@@ -84,7 +79,6 @@ export default function CarteFlotte() {
     });
   }, [missions, filterChauffeur, filterCamion]);
 
-  // --- Calculer la position centrale pour recentrage ---
   useEffect(() => {
     if (filteredMissions.length === 1) {
       const missionPositions = positions
@@ -99,16 +93,16 @@ export default function CarteFlotte() {
   }, [filteredMissions, positions]);
 
   return (
-    <div className="p-4">
+    <div className="p-4 w-full">
       {/* Filtres */}
-      <div className="flex gap-4 mb-4">
+      <div className="flex flex-col sm:flex-row gap-4 mb-4">
         <select
           value={filterChauffeur}
           onChange={e => {
             setFilterChauffeur(e.target.value);
             setFilterCamion("");
           }}
-          className="p-2 border rounded"
+          className="p-2 border rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
         >
           <option value="">Tous les chauffeurs</option>
           {chauffeurs.map(c => (
@@ -122,7 +116,7 @@ export default function CarteFlotte() {
             setFilterCamion(e.target.value);
             setFilterChauffeur("");
           }}
-          className="p-2 border rounded"
+          className="p-2 border rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
         >
           <option value="">Tous les camions</option>
           {camions.map(c => (
@@ -132,49 +126,50 @@ export default function CarteFlotte() {
       </div>
 
       {/* Carte */}
-      <MapContainer center={centerPosition} zoom={6} style={{ height: "600px", width: "100%" }}>
-        <TileLayer
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          attribution="&copy; OpenStreetMap contributors"
-        />
+      <div className="rounded-xl overflow-hidden shadow-inner border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+        <MapContainer center={centerPosition} zoom={6} style={{ height: "600px", width: "100%" }}>
+          <TileLayer
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            attribution="&copy; OpenStreetMap contributors"
+          />
 
-        {/* Recentrage automatique */}
-        <RecenterMap position={centerPosition} />
+          <RecenterMap position={centerPosition} />
 
-        {filteredMissions.map(mission => {
-          const missionPositions = positions
-            .filter(p => p.chauffeur_id === mission.chauffeur_id)
-            .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+          {filteredMissions.map(mission => {
+            const missionPositions = positions
+              .filter(p => p.chauffeur_id === mission.chauffeur_id)
+              .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
 
-          if (missionPositions.length === 0) return null;
+            if (missionPositions.length === 0) return null;
+            const lastPos = missionPositions[missionPositions.length - 1];
 
-          const lastPos = missionPositions[missionPositions.length - 1];
-          return (
-            <React.Fragment key={mission.id_uuid}>
-              {missionPositions.length > 1 && (
-                <Polyline
-                  positions={missionPositions.map(p => [p.latitude, p.longitude])}
-                  color="blue"
-                  weight={4}
-                />
-              )}
-              <Marker
-                position={[lastPos.latitude, lastPos.longitude]}
-                icon={chauffeurIcon}
-              >
-                <Tooltip direction="top" offset={[0, -10]} opacity={1}>
-                  <div>
-                    <strong>Chauffeur:</strong> {mission.user?.name} <br />
-                    <strong>Camion:</strong> {mission.camion?.immatriculation} <br />
-                    <strong>Mission:</strong> {mission.titre} <br />
-                    <strong>Destination:</strong> {mission.destination}
-                  </div>
-                </Tooltip>
-              </Marker>
-            </React.Fragment>
-          );
-        })}
-      </MapContainer>
+            return (
+              <React.Fragment key={mission.id_uuid}>
+                {missionPositions.length > 1 && (
+                  <Polyline
+                    positions={missionPositions.map(p => [p.latitude, p.longitude])}
+                    color="blue"
+                    weight={4}
+                  />
+                )}
+                <Marker
+                  position={[lastPos.latitude, lastPos.longitude]}
+                  icon={chauffeurIcon}
+                >
+                  <Tooltip direction="top" offset={[0, -10]} opacity={1}>
+                    <div>
+                      <strong>Chauffeur:</strong> {mission.user?.name} <br />
+                      <strong>Camion:</strong> {mission.camion?.immatriculation} <br />
+                      <strong>Mission:</strong> {mission.titre} <br />
+                      <strong>Destination:</strong> {mission.destination}
+                    </div>
+                  </Tooltip>
+                </Marker>
+              </React.Fragment>
+            );
+          })}
+        </MapContainer>
+      </div>
     </div>
   );
 }

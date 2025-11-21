@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "../config/supabaseClient.js";
 import { Button } from "./ui/button.jsx";
-import { Card, CardHeader, CardContent } from "./ui/card.jsx";
+import { Card, CardHeader } from "./ui/card.jsx";
 import { Pencil, Lock, Eye, Loader2 } from "lucide-react";
 import OpenMissionModalGTS from "./modals/OpenMissionModalGTS.jsx";
 import EditMissionModalGTS from "./modals/EditMissionModalGTS.jsx";
@@ -11,7 +11,7 @@ const ITEMS_PER_PAGE = 5;
 const STRUCTURE = "GTS";
 const STATUS_CLOSED = "Clôturée";
 
-// Composant Card pour chaque mission (responsive)
+// Card pour chaque mission
 const CardMissionGTS = ({ mission, chauffeur, camion, onEdit, onClose, onView }) => {
   const isClosed = mission.statut === STATUS_CLOSED;
   return (
@@ -44,6 +44,7 @@ const CardMissionGTS = ({ mission, chauffeur, camion, onEdit, onClose, onView })
   );
 };
 
+// Modal de confirmation
 const ConfirmationModal = ({ isOpen, onClose, onConfirm, message }) => {
   if (!isOpen) return null;
   return (
@@ -73,6 +74,7 @@ export default function MissionsSectionGTS() {
   const [sortOrder, setSortOrder] = useState("desc");
   const [isLoading, setIsLoading] = useState(true);
 
+  // Fetch data
   const fetchChauffeurs = useCallback(async () => {
     const { data } = await supabase.from("profiles").select("id, name, role, structure")
       .eq("role", "chauffeur").eq("structure", STRUCTURE);
@@ -122,7 +124,9 @@ export default function MissionsSectionGTS() {
   }, [missions, chauffeurs, camions, searchTerm, sortOrder, currentPage]);
 
   return (
-    <div className="p-4 md:p-6 space-y-6 bg-gray-50 dark:bg-gray-900 min-h-screen">
+    <div className="flex-1 flex flex-col space-y-6 px-4 md:px-6 py-6 animate-fadeInUp">
+
+      {/* Card ouverture mission */}
       <Card className="shadow-xl bg-white/90 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
         <CardHeader className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 sm:p-6 gap-3">
           <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-4 sm:mb-0">Missions {STRUCTURE}</h2>
@@ -141,7 +145,7 @@ export default function MissionsSectionGTS() {
 
       {/* Card view */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {isLoading ? Array.from({ length: ITEMS_PER_PAGE }).map((_, i) => (
+        {isLoading ? Array.from({ length: ITEMS_PER_PAGE }).map((_,i) => (
           <Card key={i} className="p-4 animate-pulse bg-gray-100 dark:bg-gray-700 h-40" />
         )) : paginatedMissions.length === 0 ? (
           <p className="col-span-full text-center text-gray-500 dark:text-gray-400">Aucune mission trouvée.</p>
@@ -165,9 +169,9 @@ export default function MissionsSectionGTS() {
       )}
 
       {/* Modals */}
-      {showModal && <OpenMissionModalGTS setShowModal={setShowModal} fetchMissions={fetchMissions} chauffeurs={chauffeurs} camions={camions}/>}
-      {editMission && <EditMissionModalGTS editingMission={editMission} setShowModal={setEditMission} fetchMissions={fetchMissions}/>}
-      {detailsMission && <DetailsMissionModalGTS mission={detailsMission} setShowModal={setDetailsMission}/>}
+      {showModal && <OpenMissionModalGTS setShowModal={setShowModal} fetchMissions={fetchMissions} chauffeurs={chauffeurs} camions={camions} />}
+      {editMission && <EditMissionModalGTS editingMission={editMission} setShowModal={setEditMission} fetchMissions={fetchMissions} />}
+      {detailsMission && <DetailsMissionModalGTS mission={detailsMission} setShowModal={setDetailsMission} />}
       <ConfirmationModal isOpen={confirmOpen} onClose={()=>setConfirmOpen(false)} onConfirm={confirmClose} message="Voulez-vous vraiment clôturer cette mission ?" />
     </div>
   );
