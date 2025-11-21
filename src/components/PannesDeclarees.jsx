@@ -12,7 +12,6 @@ import { Bell, MapPin, FileText, File, X } from "lucide-react";
 
 export default function PannesDeclareesCards() {
   const { toast } = useToast();
-
   const [pannes, setPannes] = useState([]);
   const [chauffeurs, setChauffeurs] = useState([]);
   const [filter, setFilter] = useState("toutes");
@@ -24,14 +23,10 @@ export default function PannesDeclareesCards() {
   const [panneToDelete, setPanneToDelete] = useState(null);
   const ITEMS_PER_PAGE = 6;
 
-  // 🔄 Charger pannes + chauffeurs
   useEffect(() => {
     const fetchData = async () => {
       const { data: chauffeursData } = await supabase.from("users").select("*").eq("role", "chauffeur");
-      const { data: pannesData } = await supabase
-        .from("alertespannes")
-        .select("*")
-        .order("created_at", { ascending: false });
+      const { data: pannesData } = await supabase.from("alertespannes").select("*").order("created_at", { ascending: false });
       setChauffeurs(chauffeursData || []);
       setPannes(pannesData || []);
     };
@@ -82,7 +77,6 @@ export default function PannesDeclareesCards() {
     }
   };
 
-  // 🔍 Filtre + recherche
   const filteredPannes = pannes.filter(p => {
     const matchFilter = filter === "toutes" ? true : p.statut === filter;
     const matchSearch =
@@ -96,7 +90,6 @@ export default function PannesDeclareesCards() {
   const totalPages = Math.ceil(filteredPannes.length / ITEMS_PER_PAGE);
   const paginatedPannes = filteredPannes.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
-  // 📊 Export Excel
   const exportExcel = () => {
     const wsData = filteredPannes.map(p => ({
       Mission: p.mission_id || "N/A",
@@ -116,7 +109,6 @@ export default function PannesDeclareesCards() {
     toast({ title: "Export Excel", description: "Liste des pannes exportée." });
   };
 
-  // 📄 Export PDF
   const exportPDF = () => {
     const doc = new jsPDF();
     doc.setFontSize(16);
@@ -143,7 +135,6 @@ export default function PannesDeclareesCards() {
     toast({ title: "Export PDF", description: "Document généré." });
   };
 
-  // 🟦 Badge statut
   const getStatusBadge = (statut) => {
     const colors = {
       en_cours: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
@@ -159,15 +150,15 @@ export default function PannesDeclareesCards() {
   };
 
   return (
-    <div className="p-3 sm:p-6 space-y-6 container max-w-[1440px] mx-auto">
+    <div className="p-4 sm:p-6 space-y-6 container max-w-[1440px] mx-auto">
 
       {/* Header */}
       <Card className="shadow-xl bg-white/90 dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
-        <CardHeader className="flex justify-between items-center p-4 sm:p-6">
+        <CardHeader className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 sm:p-6 gap-2 sm:gap-0">
           <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100 flex items-center gap-3">
             <Bell size={24} className="text-red-600" /> Gestion des Pannes
           </h2>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             <Button onClick={exportExcel} variant="outline" className="flex items-center gap-1 border-green-500 text-green-600 dark:text-green-400 dark:border-green-600 hover:bg-green-50 dark:hover:bg-green-900/30">
               <File size={16} /> Excel
             </Button>
@@ -185,12 +176,12 @@ export default function PannesDeclareesCards() {
           placeholder="🔍 Rechercher..."
           value={search}
           onChange={e => { setSearch(e.target.value); setCurrentPage(1); }}
-          className="flex-1 min-w-[150px] border border-gray-300 dark:border-gray-600 rounded px-2 py-1 dark:bg-gray-700 dark:text-gray-200"
+          className="flex-1 min-w-[150px] border border-gray-300 dark:border-gray-600 rounded px-3 py-2 dark:bg-gray-700 dark:text-gray-200"
         />
         <select
           value={filter}
           onChange={e => { setFilter(e.target.value); setCurrentPage(1); }}
-          className="border rounded px-2 py-1 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600"
+          className="border rounded px-3 py-2 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600"
         >
           <option value="toutes">Toutes</option>
           <option value="en_cours">En cours</option>
@@ -204,26 +195,24 @@ export default function PannesDeclareesCards() {
         {paginatedPannes.length === 0 ? (
           <p className="text-center col-span-full text-gray-500 dark:text-gray-400">Aucune panne trouvée</p>
         ) : paginatedPannes.map(p => (
-          <Card key={p.id} className="shadow-lg p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
-            <div className="flex justify-between items-start">
-              <div>
-                <h3 className="font-bold text-lg text-gray-800 dark:text-white">{getChauffeurName(p.chauffeur_id)}</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">Mission: {p.mission_id || "N/A"}</p>
-                <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">Type: {p.typepanne}</p>
-                <p className="text-sm text-gray-600 dark:text-gray-300 mt-1 truncate max-w-xs">Description: {p.description}</p>
-                <p className="text-sm mt-1">{getStatusBadge(p.statut)}</p>
-              </div>
-              <div className="flex flex-col gap-1">
-                {p.statut !== "resolu" && <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => updateStatut(p.id, "resolu")}>Résolu</Button>}
-                {p.statut !== "en_cours" && <Button size="sm" className="bg-yellow-600 hover:bg-yellow-700 text-white" onClick={() => updateStatut(p.id, "en_cours")}>En cours</Button>}
-                {p.latitude && p.longitude && (
-                  <a href={`https://www.google.com/maps/search/?api=1&query=${p.latitude},${p.longitude}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1">
-                    <MapPin size={14}/> Position
-                  </a>
-                )}
-                {p.photo && <Button size="sm" variant="outline" onClick={() => { setSelectedPanne(p); setShowPhotoModal(true); }}>Voir photo</Button>}
-                <Button size="sm" variant="destructive" onClick={() => { setPanneToDelete(p); setShowModalConfirm(true); }}>Supprimer</Button>
-              </div>
+          <Card key={p.id} className="shadow-lg p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 flex flex-col justify-between">
+            <div className="flex flex-col gap-2">
+              <h3 className="font-bold text-lg text-gray-800 dark:text-white">{getChauffeurName(p.chauffeur_id)}</h3>
+              <p className="text-sm text-gray-600 dark:text-gray-300">Mission: {p.mission_id || "N/A"}</p>
+              <p className="text-sm text-gray-600 dark:text-gray-300">Type: {p.typepanne}</p>
+              <p className="text-sm text-gray-600 dark:text-gray-300 truncate max-w-full">Description: {p.description}</p>
+              <p className="text-sm mt-1">{getStatusBadge(p.statut)}</p>
+            </div>
+            <div className="flex flex-wrap gap-2 mt-3">
+              {p.statut !== "resolu" && <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => updateStatut(p.id, "resolu")}>Résolu</Button>}
+              {p.statut !== "en_cours" && <Button size="sm" className="bg-yellow-600 hover:bg-yellow-700 text-white" onClick={() => updateStatut(p.id, "en_cours")}>En cours</Button>}
+              {p.latitude && p.longitude && (
+                <a href={`https://www.google.com/maps/search/?api=1&query=${p.latitude},${p.longitude}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1">
+                  <MapPin size={14}/> Position
+                </a>
+              )}
+              {p.photo && <Button size="sm" variant="outline" onClick={() => { setSelectedPanne(p); setShowPhotoModal(true); }}>Voir photo</Button>}
+              <Button size="sm" variant="destructive" onClick={() => { setPanneToDelete(p); setShowModalConfirm(true); }}>Supprimer</Button>
             </div>
           </Card>
         ))}
@@ -231,7 +220,7 @@ export default function PannesDeclareesCards() {
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex justify-center gap-2 mt-4">
+        <div className="flex flex-wrap justify-center gap-2 mt-4">
           {Array.from({ length: totalPages }, (_, i) => (
             <Button key={i} size="sm" variant={i + 1 === currentPage ? "default" : "outline"} onClick={() => setCurrentPage(i + 1)}>
               {i + 1}
@@ -242,14 +231,12 @@ export default function PannesDeclareesCards() {
 
       {/* Modal photo */}
       {showPhotoModal && selectedPanne && getPhotoUrl(selectedPanne) && (
-        <div className="fixed inset-0 bg-black/70 z-50 flex justify-center items-center p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-3xl w-full relative shadow-2xl">
+        <div className="fixed inset-0 z-50 flex justify-center items-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white dark:bg-gray-900 rounded-lg p-4 sm:p-6 max-w-3xl w-full relative shadow-2xl flex flex-col gap-4">
             <button onClick={() => setShowPhotoModal(false)} className="absolute -top-3 -right-3 p-1 rounded-full bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-600 shadow-lg transition">
               <X size={28}/>
             </button>
-            <h3 className="text-xl font-bold mb-3 text-gray-800 dark:text-gray-100">
-              Photo de la panne ({selectedPanne.typepanne})
-            </h3>
+            <h3 className="text-xl font-bold text-gray-800 dark:text-gray-100">Photo de la panne ({selectedPanne.typepanne})</h3>
             <img src={getPhotoUrl(selectedPanne)} alt="Panne" className="w-full h-auto object-contain rounded-lg max-h-[80vh]" />
           </div>
         </div>
