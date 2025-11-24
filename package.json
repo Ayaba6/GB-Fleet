@@ -16,6 +16,7 @@
     "@supabase/auth-ui-shared": "^0.1.8",
     "@supabase/supabase-js": "^2.78.0",
     "class-variance-authority": "^0.7.1",
+    "framer-motion": "^12.23.24",
     "jspdf": "^3.0.3",
     "jspdf-autotable": "^5.0.2",
     "leaflet": "^1.9.4",
