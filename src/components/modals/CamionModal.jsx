@@ -4,7 +4,7 @@ import { supabase } from "../../config/supabaseClient.js";
 import { Loader2, Upload, Camera, FileText } from "lucide-react";
 import { Button } from "../ui/button.jsx";
 import { useToast } from "../ui/use-toast.jsx";
-import Modal from "../ui/Modal.jsx";
+import Modal from "../ui/modal.jsx";
 
 const BASE_INPUT_STYLE = `
   w-full p-2.5 rounded-lg border
