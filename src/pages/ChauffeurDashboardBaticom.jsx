@@ -1,161 +1,224 @@
+// src/pages/ChauffeurDashboardBaticom.jsx
 import React, { useEffect, useState } from "react";
 import { supabase } from "../config/supabaseClient.js";
+import { Card, CardHeader, CardContent } from "../components/ui/card.jsx";
 import { Button } from "../components/ui/button.jsx";
-import DetailsMissionModalGTS from "../components/modals/DetailsMissionModalGTS.jsx";
 import { useToast } from "../components/ui/use-toast.jsx";
-import { AlertTriangle, Loader2 } from "lucide-react";
-import IncidentModalGTS from "../components/modals/IncidentModalGTS.jsx";
+import ConfirmDialog from "../components/ui/ConfirmDialog.jsx";
+import { LogOut, Moon, Sun } from "lucide-react";
 
-export default function ChauffeurDashboardGTS({ session }) {
-  const { toast } = useToast();
-  const [mission, setMission] = useState(null);
+export default function ChauffeurDashboardBaticom({ session }) {
+  const chauffeurId = session?.user?.id;
+  const [journee, setJournee] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [showDetails, setShowDetails] = useState(false);
-  const [showIncidentModal, setShowIncidentModal] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [panneDialog, setPanneDialog] = useState(false);
 
-  const fetchMission = async () => {
+  const [darkMode, setDarkMode] = useState(
+    window.matchMedia("(prefers-color-scheme: dark)").matches
+  );
+
+  const { toast } = useToast();
+
+  // Appliquer dark/light mode
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", darkMode);
+  }, [darkMode]);
+
+  // Récupérer la journée ouverte
+  const fetchJournee = async () => {
+    if (!chauffeurId) return;
+
     setLoading(true);
+    console.log(`Fetching journée pour chauffeurId: ${chauffeurId}`);
+
     const { data, error } = await supabase
-      .from("missions_gts")
-      .select(
-        `*, 
-         profiles:chauffeur_id (name),
-         camions:camion_id (immatriculation)`
-      )
-      .eq("chauffeur_id", session.user.id)
-      .in("statut", ["Attribuée", "En route pour Lomé", "Arrivé à Lomé", "En retour vers Ouaga", "Arrivé à Ouaga", "En cours"])
-      .order("date", { ascending: false })
-      .limit(1)
-      .single();
+      .from("journee_baticom")
+      .select("*, camions(*)")
+      .eq("chauffeur_id", chauffeurId)
+      .eq("statut", "ouverte")
+      .maybeSingle();
 
     if (error) {
-      console.error(error);
-      toast({ title: "Erreur", description: "Impossible de charger la mission.", variant: "destructive" });
+      console.error("Erreur récupération journée :", error.message);
+      setJournee(null);
     } else {
-      setMission(data);
+      console.log("Données récupérées :", data);
+      setJournee(data);
+      if (data) setShowModal(true);
     }
+
     setLoading(false);
   };
 
   useEffect(() => {
-    if (session?.user?.id) fetchMission();
-  }, [session]);
+    fetchJournee();
 
-  const updateStatut = async (newStatut) => {
-    const updates = { statut: newStatut };
-    if (newStatut === "En route pour Lomé") {
-      updates.date_depart = new Date().toISOString().split("T")[0];
-    }
-    if (newStatut === "Arrivé à Ouaga") {
-      updates.date_cloture = new Date().toISOString().split("T")[0];
-    }
+    const channel = supabase
+      .channel("journee_realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "journee_baticom" },
+        (payload) => {
+          if (payload.new?.chauffeur_id === chauffeurId) fetchJournee();
+        }
+      )
+      .subscribe();
 
-    const { error } = await supabase
-      .from("missions_gts")
-      .update(updates)
-      .eq("id", mission.id);
+    return () => supabase.removeChannel(channel);
+  }, [chauffeurId]);
+
+  // Déclarer une panne
+  const handleDeclarePanne = async () => {
+    if (!journee) return;
+
+    const { error } = await supabase.from("pannes").insert({
+      chauffeur_id: chauffeurId,
+      camion_id: journee.camion_id,
+      journee_id: journee.id,
+      description: "Panne déclarée",
+      created_at: new Date(),
+    });
 
     if (error) {
-      toast({ title: "Erreur", description: error.message, variant: "destructive" });
-    } else {
-      toast({ title: "Succès", description: `Statut mis à jour : ${newStatut}` });
-      fetchMission();
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: error.message,
+      });
+      return;
     }
+
+    toast({ title: "Panne déclarée !" });
+    setPanneDialog(false);
   };
 
-  if (loading) {
+  // Déconnexion
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+  };
+
+  if (loading)
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen">
-        <Loader2 className="animate-spin h-10 w-10 text-gray-500" />
-        <p className="text-gray-500 mt-3">Chargement de la mission...</p>
+      <div className="flex items-center justify-center min-h-screen">
+        <p className="text-gray-600 dark:text-gray-300">Chargement...</p>
       </div>
     );
-  }
-
-  if (!mission) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen">
-        <AlertTriangle className="text-gray-400 h-12 w-12" />
-        <h2 className="text-lg font-semibold mt-4">Aucune mission en cours</h2>
-        <p className="text-gray-500">Aucune mission ne vous a encore été attribuée.</p>
-      </div>
-    );
-  }
-
-  const actions = [];
-  if (mission.statut === "Attribuée") {
-    actions.push({
-      label: "Démarrer la mission",
-      onClick: () => updateStatut("En route pour Lomé"),
-      color: "bg-green-600 hover:bg-green-700",
-    });
-  } else if (mission.statut === "En route pour Lomé") {
-    actions.push({
-      label: "Signaler arrivée à Lomé",
-      onClick: () => updateStatut("Arrivé à Lomé"),
-      color: "bg-blue-600 hover:bg-blue-700",
-    });
-  } else if (mission.statut === "Arrivé à Lomé") {
-    actions.push({
-      label: "Départ retour vers Ouaga",
-      onClick: () => updateStatut("En retour vers Ouaga"),
-      color: "bg-orange-600 hover:bg-orange-700",
-    });
-  } else if (mission.statut === "En retour vers Ouaga") {
-    actions.push({
-      label: "Signaler arrivée à Ouaga",
-      onClick: () => updateStatut("Arrivé à Ouaga"),
-      color: "bg-purple-600 hover:bg-purple-700",
-    });
-  }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-3xl mx-auto bg-white rounded-2xl shadow-lg p-6">
-        <h1 className="text-2xl font-bold mb-4">🚛 Tableau de bord chauffeur GTS</h1>
+    <div className="p-6 space-y-6 min-h-screen bg-gray-100 dark:bg-gray-900 transition-colors">
 
-        <div className="border rounded-lg p-4 mb-4">
-          <h2 className="text-lg font-semibold mb-2">{mission.titre || "Mission sans titre"}</h2>
-          <p><strong>Destination :</strong> {mission.destination || "—"}</p>
-          <p><strong>Statut actuel :</strong> <span className="text-blue-600 font-medium">{mission.statut}</span></p>
-          <p><strong>Tonnage prévu :</strong> {mission.tonnage} T</p>
-        </div>
+      {/* HEADER */}
+      <div className="flex justify-between items-center mb-4">
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+          Tableau de bord chauffeur
+        </h1>
 
-        <div className="flex flex-wrap gap-3">
-          <Button onClick={() => setShowDetails(true)} className="bg-gray-700 hover:bg-gray-800">
-            Voir les détails
+        <div className="flex gap-3">
+
+          {/* Toggle Thème */}
+          <Button
+            onClick={() => setDarkMode(!darkMode)}
+            variant="outline"
+            className="flex items-center gap-2 border-gray-400 dark:border-gray-600 text-gray-800 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700"
+          >
+            {darkMode ? <Sun size={18} /> : <Moon size={18} />}
+            {darkMode ? "Clair" : "Sombre"}
           </Button>
 
-          {actions.map((a, i) => (
-            <Button key={i} onClick={a.onClick} className={a.color}>
-              {a.label}
-            </Button>
-          ))}
-
-          <Button onClick={() => setShowIncidentModal(true)} variant="destructive">
-            Signaler un incident
+          {/* Déconnexion */}
+          <Button
+            onClick={handleSignOut}
+            variant="destructive"
+            className="flex items-center gap-2 px-4 py-2"
+          >
+            <LogOut size={18} />
+            Déconnexion
           </Button>
+
         </div>
       </div>
 
-      {showDetails && (
-        <DetailsMissionModalGTS
-          mission={{
-            ...mission,
-            chauffeur_nom: mission.profiles?.name,
-            camion_nom: mission.camions?.immatriculation,
-          }}
-          onClose={() => setShowDetails(false)}
-        />
+      {/* Aucune journée */}
+      {!journee && (
+        <Card className="p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow">
+          <p className="text-gray-700 dark:text-gray-300">
+            Aucune journée ouverte pour le moment.
+          </p>
+        </Card>
       )}
 
-      {showIncidentModal && (
-        <IncidentModalGTS
-          missionId={mission.id}
-          chauffeurId={session.user.id}
-          onClose={() => setShowIncidentModal(false)}
-        />
+      {/* JOURNÉE */}
+      {journee && (
+        <Card className="p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow">
+          <CardHeader>
+            <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-100">
+              Journée en cours
+            </h2>
+          </CardHeader>
+
+          <CardContent className="space-y-3 text-gray-800 dark:text-gray-200">
+            <p>
+              <strong>Camion :</strong> {journee.camions?.numero_camion || "N/A"}
+            </p>
+            <p>
+              <strong>Carburant restant :</strong> {journee.fuel_restant} L
+            </p>
+            <p>
+              <strong>Date :</strong>{" "}
+              {new Date(journee.date).toLocaleDateString()}
+            </p>
+
+            <Button
+              onClick={() => setPanneDialog(true)}
+              variant="destructive"
+              className="mt-4 flex items-center gap-2"
+            >
+              Déclarer une panne
+            </Button>
+          </CardContent>
+        </Card>
       )}
+
+      {/* MODAL NOUVELLE JOURNEE */}
+      {showModal && journee && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
+          <Card className="w-[400px] p-6 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 shadow-xl">
+            <h2 className="text-xl font-semibold mb-3 text-gray-900 dark:text-gray-100">
+              Nouvelle journée assignée
+            </h2>
+            <p>
+              <strong>Camion :</strong> {journee.camions?.numero_camion}
+            </p>
+            <p>
+              <strong>Carburant restant :</strong> {journee.fuel_restant} L
+            </p>
+            <p>
+              <strong>Date :</strong>{" "}
+              {new Date(journee.date).toLocaleDateString()}
+            </p>
+
+            <div className="mt-5 flex justify-end">
+              <Button
+                variant="outline"
+                onClick={() => setShowModal(false)}
+                className="border-gray-400 dark:border-gray-600 text-gray-800 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700"
+              >
+                Fermer
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* CONFIRMATION PANNE */}
+      <ConfirmDialog
+        open={panneDialog}
+        title="Déclarer une panne"
+        description="Êtes-vous sûr de vouloir déclarer une panne ?"
+        onClose={() => setPanneDialog(false)}
+        onConfirm={handleDeclarePanne}
+      />
     </div>
   );
 }

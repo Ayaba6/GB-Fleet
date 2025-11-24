@@ -1,40 +1,44 @@
+// src/components/UsersSection.jsx
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../config/supabaseClient.js";
 import { Button } from "../components/ui/button.jsx";
-import { Card, CardHeader, CardContent } from "../components/ui/card.jsx";
+import { Card, CardHeader } from "../components/ui/card.jsx";
 import { useToast } from "../components/ui/use-toast.jsx";
 import ConfirmDialog from "../components/ui/ConfirmDialog.jsx";
 import UserModal from "./modals/UserModal.jsx";
-import { Pencil, Trash2, Users, FileText, User, Mail, Phone, Calendar } from "lucide-react";
+import { Pencil, Trash2, User as UserIcon, FileText } from "lucide-react";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
-// --- Documents utilisateur ---
 const renderDocuments = (u) => {
   const docs = [];
-  const addDoc = (url, label, expiry) => {
-    if (url)
+  const docList = [
+    { url: u.cniburl, label: "CNIB", expiry: u.cnib_expiration },
+    { url: u.permisurl, label: "Permis", expiry: u.permis_expiration },
+    { url: u.carteurl, label: "Carte Transport", expiry: u.carte_expiration },
+    { url: u.actenaissanceurl, label: "Acte Naissance" }
+  ];
+  docList.forEach(({ url, label, expiry }, i) => {
+    if (url) {
+      const expired = expiry && new Date(expiry) < new Date();
       docs.push(
         <a
-          key={label}
+          key={i}
           href={url}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-blue-600 dark:text-blue-400 hover:underline text-sm flex items-center gap-1"
+          className={`text-blue-600 dark:text-blue-400 hover:underline text-sm flex items-center gap-1 ${expired ? "line-through" : ""}`}
         >
           <FileText size={14} /> {label} {expiry && <span className="text-xs text-gray-500 dark:text-gray-300">({new Date(expiry).toLocaleDateString()})</span>}
         </a>
       );
-  };
-  addDoc(u.cniburl, "CNIB", u.cnibexpiry);
-  addDoc(u.permisurl, "Permis", u.permisexpiry);
-  addDoc(u.carteurl, "Carte", u.carteexpiry);
-  addDoc(u.actenaissanceurl, "Acte de naissance", u.actenaissanceexpiry);
+    }
+  });
   return docs.length ? <div className="flex flex-col gap-1 mt-1">{docs}</div> : <span className="text-gray-400 italic text-sm">Aucun document</span>;
 };
 
-export default function UserSection() {
+export default function UsersSection() {
   const { toast } = useToast();
   const [users, setUsers] = useState([]);
   const [showModal, setShowModal] = useState(false);
@@ -59,7 +63,7 @@ export default function UserSection() {
     try {
       const { error } = await supabase.from("profiles").delete().eq("id", userToDelete.id);
       if (error) throw error;
-      toast({ title: "Utilisateur supprimé", description: `Le compte "${userToDelete.name}" a été supprimé.` });
+      toast({ title: "Utilisateur supprimé", description: `L'utilisateur "${userToDelete.name}" a été supprimé.` });
       fetchUsers();
       setUserToDelete(null);
       setConfirmOpen(false);
@@ -73,8 +77,7 @@ export default function UserSection() {
 
   const filteredUsers = users.filter(
     (u) =>
-      (u.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        u.email?.toLowerCase().includes(searchTerm.toLowerCase())) &&
+      u.name?.toLowerCase().includes(searchTerm.toLowerCase()) &&
       (roleFilter === "" || u.role === roleFilter) &&
       (structureFilter === "" || u.structure === structureFilter)
   );
@@ -86,16 +89,22 @@ export default function UserSection() {
     const wsData = filteredUsers.map((u) => ({
       Nom: u.name,
       Email: u.email,
+      Téléphone: u.phone,
       Rôle: u.role,
       Structure: u.structure || "",
-      Téléphone: u.phone || "",
-      "Date création": new Date(u.created_at).toLocaleDateString(),
+      CNIB: u.cniburl ? "Oui" : "",
+      "Exp. CNIB": u.cnib_expiration || "",
+      Permis: u.permisurl ? "Oui" : "",
+      "Exp. Permis": u.permis_expiration || "",
+      "Carte Transport": u.carteurl ? "Oui" : "",
+      "Exp. Carte Transport": u.carte_expiration || "",
+      "Acte Naissance": u.actenaissanceurl ? "Oui" : ""
     }));
     const ws = XLSX.utils.json_to_sheet(wsData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Utilisateurs");
     XLSX.writeFile(wb, "liste_utilisateurs.xlsx");
-    toast({ title: "Export Excel", description: "Liste exportée." });
+    toast({ title: "Export Excel", description: "Liste des utilisateurs exportée." });
   };
 
   const exportPDF = () => {
@@ -106,8 +115,8 @@ export default function UserSection() {
     doc.text(`Généré le: ${new Date().toLocaleString()}`, 14, 28);
     autoTable(doc, {
       startY: 35,
-      head: [["Nom", "Email", "Rôle", "Structure", "Téléphone", "Date"]],
-      body: filteredUsers.map((u) => [u.name, u.email, u.role, u.structure || "", u.phone || "", new Date(u.created_at).toLocaleDateString()]),
+      head: [["Nom", "Email", "Téléphone", "Rôle", "Structure"]],
+      body: filteredUsers.map((u) => [u.name, u.email, u.phone || "-", u.role, u.structure || "-"]),
       theme: "grid",
       styles: { fontSize: 9 },
     });
@@ -121,10 +130,10 @@ export default function UserSection() {
       <Card className="shadow-lg bg-white/80 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 backdrop-blur-sm">
         <CardHeader className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
           <h2 className="text-xl sm:text-2xl font-bold text-gray-800 dark:text-gray-100 flex items-center gap-3">
-            <Users size={24} className="text-blue-600 dark:text-blue-400" /> Gestion des utilisateurs
+            <UserIcon size={24} className="text-blue-600 dark:text-blue-400" /> Gestion des Utilisateurs
           </h2>
           <Button onClick={handleAdd} className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white">
-            + Créer utilisateur
+            + Créer Utilisateur
           </Button>
         </CardHeader>
       </Card>
@@ -136,35 +145,34 @@ export default function UserSection() {
           placeholder="🔍 Rechercher..."
           value={searchTerm}
           onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-          className="flex-1 min-w-[150px] border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-200"
+          className="flex-1 min-w-[150px] border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white text-gray-800 dark:bg-gray-700 dark:text-gray-200"
         />
         <select
           value={roleFilter}
           onChange={(e) => { setRoleFilter(e.target.value); setCurrentPage(1); }}
-          className="border rounded px-2 py-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-200 border-gray-300 dark:border-gray-600"
+          className="border rounded px-2 py-1 bg-white text-gray-800 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600"
         >
           <option value="">Tous rôles</option>
           <option value="chauffeur">Chauffeur</option>
-          <option value="admin">Admin</option>
           <option value="superviseur">Superviseur</option>
+          <option value="admin">Admin</option>
         </select>
         <select
           value={structureFilter}
           onChange={(e) => { setStructureFilter(e.target.value); setCurrentPage(1); }}
-          className="border rounded px-2 py-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-200 border-gray-300 dark:border-gray-600"
+          className="border rounded px-2 py-1 bg-white text-gray-800 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600"
         >
           <option value="">Toutes structures</option>
-          <option value="GTS">GTS</option>
           <option value="BATICOM">BATICOM</option>
+          <option value="GTS">GTS</option>
         </select>
-
         <div className="flex gap-2">
           <Button onClick={exportExcel} variant="outline" className="border-green-500 text-green-600 dark:text-green-400">Excel</Button>
           <Button onClick={exportPDF} variant="outline" className="border-red-500 text-red-600 dark:text-red-400">PDF</Button>
         </div>
       </div>
 
-      {/* Liste utilisateurs */}
+      {/* Liste des cartes */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {paginatedUsers.length === 0 ? (
           <p className="text-center col-span-full text-gray-500 dark:text-gray-400">Aucun utilisateur trouvé</p>
@@ -174,13 +182,12 @@ export default function UserSection() {
               <div className="flex justify-between items-start">
                 <div>
                   <h3 className="font-bold text-lg text-gray-800 dark:text-white flex items-center gap-2">
-                    <User size={18} /> {u.name}
+                    <UserIcon size={18} /> {u.name}
                   </h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-300 flex items-center gap-1"><Mail size={14} /> {u.email}</p>
-                  <p className="text-sm text-gray-600 dark:text-gray-300 flex items-center gap-1"><Phone size={14} /> {u.phone || "-"}</p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 capitalize">
-                    <b>Rôle:</b> {u.role} | <b>Structure:</b> {u.structure || "-"}
-                  </p>
+                  <p className="text-sm text-gray-600 dark:text-gray-300">Email: {u.email}</p>
+                  {u.phone && <p className="text-sm text-gray-600 dark:text-gray-300">Tel: {u.phone}</p>}
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Rôle: {u.role}</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Structure: {u.structure || "-"}</p>
                 </div>
                 <div className="flex gap-2">
                   <Button variant="outline" size="icon" onClick={() => handleEdit(u)} className="bg-white/50 dark:bg-gray-700/50 hover:bg-white/70 dark:hover:bg-gray-600/60 transition">
@@ -191,12 +198,7 @@ export default function UserSection() {
                   </Button>
                 </div>
               </div>
-
               <div className="mt-3">{renderDocuments(u)}</div>
-
-              <div className="mt-3 text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
-                <Calendar size={12} /> Créé le {new Date(u.created_at).toLocaleDateString()}
-              </div>
             </Card>
           ))
         )}
