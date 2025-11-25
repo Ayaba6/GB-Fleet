@@ -1,4 +1,4 @@
-// src/components/PannesDeclareesCards.jsx
+// src/components/PannesDeclareesCardsBaticom.jsx
 import React, { useEffect, useState } from "react";
 import { supabase } from "../config/supabaseClient.js";
 import { Card, CardHeader } from "./ui/card.jsx";
@@ -10,7 +10,8 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { Bell, MapPin, FileText, File, X } from "lucide-react";
 
-export default function PannesDeclareesCards() {
+export default function PannesDeclareesCardsBaticom() {
+  const STRUCTURE = "BATICOM";
   const { toast } = useToast();
   const [pannes, setPannes] = useState([]);
   const [chauffeurs, setChauffeurs] = useState([]);
@@ -23,29 +24,42 @@ export default function PannesDeclareesCards() {
   const [panneToDelete, setPanneToDelete] = useState(null);
   const ITEMS_PER_PAGE = 6;
 
+  // --- Récupération des pannes et chauffeurs ---
   useEffect(() => {
     const fetchData = async () => {
-      const { data: chauffeursData } = await supabase.from("users").select("*").eq("role", "chauffeur");
-      const { data: pannesData } = await supabase.from("alertespannes").select("*").order("created_at", { ascending: false });
+      const { data: chauffeursData } = await supabase
+        .from("users")
+        .select("*")
+        .eq("role", "chauffeur")
+        .eq("structure", STRUCTURE);
+
+      const { data: pannesData } = await supabase
+        .from("alertespannes")
+        .select("*")
+        .eq("structure", STRUCTURE)
+        .order("created_at", { ascending: false });
+
       setChauffeurs(chauffeursData || []);
       setPannes(pannesData || []);
     };
+
     fetchData();
 
-    // Realtime notifications
-    const pannesChannel = supabase
-      .channel("pannes")
+    const channel = supabase
+      .channel(`pannes-${STRUCTURE}`)
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "alertespannes" },
         (payload) => {
-          setPannes(prev => [payload.new, ...prev]);
-          toast(`Nouvelle panne : ${payload.new.typepanne}`, { duration: 5000 });
+          if (payload.new.structure === STRUCTURE) {
+            setPannes(prev => [payload.new, ...prev]);
+            toast(`Nouvelle panne : ${payload.new.typepanne}`, { duration: 5000 });
+          }
         }
       )
       .subscribe();
 
-    return () => supabase.removeChannel(pannesChannel);
+    return () => supabase.removeChannel(channel);
   }, [toast]);
 
   const getChauffeurName = (id) => chauffeurs.find(c => c.id === id)?.name || "Inconnu";
@@ -65,6 +79,20 @@ export default function PannesDeclareesCards() {
     }
   };
 
+  const handleTraiterPanne = async (panne) => {
+    const { error } = await supabase
+      .from("alertespannes")
+      .update({ statut: "resolu" })
+      .eq("id", panne.id);
+
+    if (error) {
+      toast({ title: "Erreur", description: error.message, variant: "destructive" });
+    } else {
+      setPannes(prev => prev.map(p => (p.id === panne.id ? { ...p, statut: "resolu" } : p)));
+      toast({ title: "Panne traitée", description: `"${panne.typepanne}" a été résolue.` });
+    }
+  };
+
   const confirmDelete = async () => {
     try {
       await supabase.from("alertespannes").delete().eq("id", panneToDelete.id);
@@ -77,6 +105,7 @@ export default function PannesDeclareesCards() {
     }
   };
 
+  // --- Filtrage et pagination ---
   const filteredPannes = pannes.filter(p => {
     const matchFilter = filter === "toutes" ? true : p.statut === filter;
     const matchSearch =
@@ -90,6 +119,7 @@ export default function PannesDeclareesCards() {
   const totalPages = Math.ceil(filteredPannes.length / ITEMS_PER_PAGE);
   const paginatedPannes = filteredPannes.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
+  // --- Export Excel / PDF ---
   const exportExcel = () => {
     const wsData = filteredPannes.map(p => ({
       Mission: p.mission_id || "N/A",
@@ -105,14 +135,14 @@ export default function PannesDeclareesCards() {
     const ws = XLSX.utils.json_to_sheet(wsData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Pannes");
-    XLSX.writeFile(wb, "pannes.xlsx");
+    XLSX.writeFile(wb, "pannes-baticom.xlsx");
     toast({ title: "Export Excel", description: "Liste des pannes exportée." });
   };
 
   const exportPDF = () => {
     const doc = new jsPDF();
     doc.setFontSize(16);
-    doc.text("Liste des Pannes Déclarées", 14, 20);
+    doc.text("Liste des Pannes Déclarées - BATICOM", 14, 20);
     autoTable(doc, {
       startY: 30,
       head: [["Mission", "Chauffeur", "Type", "Description", "Statut", "Date", "Latitude", "Longitude", "Photo"]],
@@ -131,7 +161,7 @@ export default function PannesDeclareesCards() {
       styles: { fontSize: 9 },
       headStyles: { fillColor: [240, 240, 240] }
     });
-    doc.save("pannes.pdf");
+    doc.save("pannes-baticom.pdf");
     toast({ title: "Export PDF", description: "Document généré." });
   };
 
@@ -151,12 +181,11 @@ export default function PannesDeclareesCards() {
 
   return (
     <div className="p-4 sm:p-6 space-y-6 container max-w-[1440px] mx-auto">
-
       {/* Header */}
       <Card className="shadow-xl bg-white/90 dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
         <CardHeader className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 sm:p-6 gap-2 sm:gap-0">
           <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100 flex items-center gap-3">
-            <Bell size={24} className="text-red-600" /> Gestion des Pannes
+            <Bell size={24} className="text-red-600" /> Gestion des Pannes BATICOM
           </h2>
           <div className="flex gap-2 flex-wrap">
             <Button onClick={exportExcel} variant="outline" className="flex items-center gap-1 border-green-500 text-green-600 dark:text-green-400 dark:border-green-600 hover:bg-green-50 dark:hover:bg-green-900/30">
@@ -190,7 +219,7 @@ export default function PannesDeclareesCards() {
         </select>
       </div>
 
-      {/* Liste sous forme de cards */}
+      {/* Liste des pannes */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {paginatedPannes.length === 0 ? (
           <p className="text-center col-span-full text-gray-500 dark:text-gray-400">Aucune panne trouvée</p>
@@ -204,15 +233,30 @@ export default function PannesDeclareesCards() {
               <p className="text-sm mt-1">{getStatusBadge(p.statut)}</p>
             </div>
             <div className="flex flex-wrap gap-2 mt-3">
-              {p.statut !== "resolu" && <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => updateStatut(p.id, "resolu")}>Résolu</Button>}
-              {p.statut !== "en_cours" && <Button size="sm" className="bg-yellow-600 hover:bg-yellow-700 text-white" onClick={() => updateStatut(p.id, "en_cours")}>En cours</Button>}
               {p.latitude && p.longitude && (
                 <a href={`https://www.google.com/maps/search/?api=1&query=${p.latitude},${p.longitude}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1">
                   <MapPin size={14}/> Position
                 </a>
               )}
-              {p.photo && <Button size="sm" variant="outline" onClick={() => { setSelectedPanne(p); setShowPhotoModal(true); }}>Voir photo</Button>}
-              <Button size="sm" variant="destructive" onClick={() => { setPanneToDelete(p); setShowModalConfirm(true); }}>Supprimer</Button>
+              {p.photo && (
+                <Button size="sm" variant="outline" onClick={() => { setSelectedPanne(p); setShowPhotoModal(true); }}>
+                  Voir photo
+                </Button>
+              )}
+              <Button size="sm" variant="destructive" onClick={() => { setPanneToDelete(p); setShowModalConfirm(true); }}>
+                Supprimer
+              </Button>
+              {/* Nouveau bouton Traiter */}
+              {p.statut !== "resolu" && (
+                <Button
+                  size="sm"
+                  variant="default"
+                  className="whitespace-nowrap border-blue-500 text-blue-700 dark:border-blue-400 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-700"
+                  onClick={() => handleTraiterPanne(p)}
+                >
+                  Traiter
+                </Button>
+              )}
             </div>
           </Card>
         ))}
@@ -229,7 +273,7 @@ export default function PannesDeclareesCards() {
         </div>
       )}
 
-      {/* Modal photo */}
+      {/* Modal Photo */}
       {showPhotoModal && selectedPanne && getPhotoUrl(selectedPanne) && (
         <div className="fixed inset-0 z-50 flex justify-center items-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="bg-white dark:bg-gray-900 rounded-lg p-4 sm:p-6 max-w-3xl w-full relative shadow-2xl flex flex-col gap-4">

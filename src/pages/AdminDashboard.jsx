@@ -20,7 +20,7 @@ import AdminSidebar from "../components/AdminSidebar.jsx";
 import UserSection from "../components/UserSection.jsx";
 import CamionsSection from "../components/CamionsSection.jsx";
 import MissionsSection from "../components/MissionsSectionAdmin.jsx";
-import PannesDeclarees from "../components/PannesDeclarees.jsx";
+import PannesDeclarees from "../components/PannesSectionAdmin.jsx";
 import AlertesExpiration from "../components/AlertesExpiration.jsx";
 import CarteFlotte from "../components/CarteFlotte.jsx";
 import BillingExpenses from "../components/BillingExpenses.jsx";

@@ -1,3 +1,4 @@
+// src/components/MissionsSectionGTS.jsx
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "../config/supabaseClient.js";
 import { Button } from "./ui/button.jsx";
@@ -14,6 +15,9 @@ const STATUS_CLOSED = "Clôturée";
 // Card pour chaque mission
 const CardMissionGTS = ({ mission, chauffeur, camion, onEdit, onClose, onView }) => {
   const isClosed = mission.statut === STATUS_CLOSED;
+
+  const textClass = "text-gray-900 dark:text-gray-100";       // Texte principal (chauffeur)
+  const subTextClass = "text-gray-800 dark:text-gray-300";    // Texte secondaire (camion, date)
 
   return (
     <Card className="relative shadow-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-5 rounded-2xl hover:shadow-2xl transition-shadow duration-300">
@@ -32,28 +36,28 @@ const CardMissionGTS = ({ mission, chauffeur, camion, onEdit, onClose, onView })
         {/* Chauffeur */}
         <div className="flex items-center gap-2">
           <User className="text-indigo-500 w-5 h-5" />
-          <p className="font-semibold text-gray-900 dark:text-gray-100 text-lg">{chauffeur?.name || "N/A"}</p>
+          <p className={`font-semibold text-lg ${textClass}`}>{chauffeur?.name || "N/A"}</p>
         </div>
 
         {/* Camion */}
         <div className="flex items-center gap-2">
           <Truck className="text-blue-500 w-5 h-5" />
-          <p className="text-gray-700 dark:text-gray-300 font-medium">{camion?.immatriculation || "N/A"}</p>
+          <p className={`font-medium ${subTextClass}`}>{camion?.immatriculation || "N/A"}</p>
         </div>
 
         {/* Date */}
         <div className="flex items-center gap-2">
           <Calendar className="text-green-500 w-5 h-5" />
-          <p className="text-gray-700 dark:text-gray-300">{mission.date ? new Date(mission.date).toLocaleDateString() : "N/A"}</p>
+          <p className={subTextClass}>{mission.date ? new Date(mission.date).toLocaleDateString() : "N/A"}</p>
         </div>
 
         {/* Frais */}
         <div className="flex flex-wrap gap-3">
           <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded-md text-sm">
-            <DollarSign className="w-4 h-4 text-green-500" /> {mission.frais_fuel || 0} DH Fuel
+            <DollarSign className="w-4 h-4 text-green-600" /> {mission.frais_fuel || 0} DH Fuel
           </div>
           <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded-md text-sm">
-            <DollarSign className="w-4 h-4 text-red-500" /> {mission.frais_mission || 0} DH Mission
+            <DollarSign className="w-4 h-4 text-red-600" /> {mission.frais_mission || 0} DH Mission
           </div>
         </div>
 
@@ -63,7 +67,7 @@ const CardMissionGTS = ({ mission, chauffeur, camion, onEdit, onClose, onView })
             <>
               <Button
                 size="sm"
-                className="flex items-center gap-2 px-3 py-1 border border-gray-500 text-gray-700 dark:border-gray-400 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition"
+                className="flex items-center gap-2 px-3 py-1 border border-gray-500 text-gray-800 dark:border-gray-400 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition"
                 onClick={() => onEdit(mission)}
               >
                 <Pencil size={16}/> Modifier
@@ -79,7 +83,7 @@ const CardMissionGTS = ({ mission, chauffeur, camion, onEdit, onClose, onView })
           ) : (
             <Button
               size="sm"
-              className="flex items-center gap-2 px-3 py-1 border border-gray-500 text-gray-700 dark:border-gray-400 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition"
+              className="flex items-center gap-2 px-3 py-1 border border-gray-500 text-gray-800 dark:border-gray-400 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition"
               onClick={() => onView(mission)}
             >
               <Eye size={16}/> Détails
@@ -97,7 +101,7 @@ const ConfirmationModal = ({ isOpen, onClose, onConfirm, message }) => {
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
       <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-xl text-center max-w-sm">
-        <p className="mb-6 text-gray-700 dark:text-gray-200">{message}</p>
+        <p className="mb-6 text-gray-800 dark:text-gray-200">{message}</p>
         <div className="flex justify-center gap-3">
           <Button className="bg-green-600 hover:bg-green-700 text-white" onClick={onConfirm}>Oui</Button>
           <Button variant="outline" onClick={onClose}>Non</Button>
@@ -174,7 +178,7 @@ export default function MissionsSectionGTS() {
       {/* Header */}
       <Card className="shadow-xl bg-white/90 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
         <CardHeader className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 sm:p-6 gap-3">
-          <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-4 sm:mb-0">Missions {STRUCTURE}</h2>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4 sm:mb-0">Missions {STRUCTURE}</h2>
           <Button className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white flex items-center gap-2" onClick={() => setShowModal(true)}>
             Ouvrir mission
           </Button>
@@ -198,7 +202,7 @@ export default function MissionsSectionGTS() {
         {isLoading ? Array.from({ length: ITEMS_PER_PAGE }).map((_,i) => (
           <Card key={i} className="p-4 animate-pulse bg-gray-100 dark:bg-gray-700 h-40 rounded-xl shadow-sm" />
         )) : paginatedMissions.length === 0 ? (
-          <p className="col-span-full text-center text-gray-500 dark:text-gray-400">Aucune mission trouvée.</p>
+          <p className="col-span-full text-center text-gray-700 dark:text-gray-400">Aucune mission trouvée.</p>
         ) : paginatedMissions.map(m => {
           const chauffeur = chauffeurs.find(c => c.id === m.chauffeur_id);
           const camion = camions.find(c => c.id === m.camion_id);

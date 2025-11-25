@@ -1,11 +1,11 @@
 // src/pages/ChauffeurDashboardBaticom.jsx
 import React, { useEffect, useState } from "react";
-import { supabase } from "../config/supabaseClient.js";
+import { supabase } from "./../config/supabaseClient.js";
 import { Card, CardHeader, CardContent } from "../components/ui/card.jsx";
 import { Button } from "../components/ui/button.jsx";
 import { useToast } from "../components/ui/use-toast.jsx";
-import ConfirmDialog from "../components/ui/ConfirmDialog.jsx";
 import { LogOut, Moon, Sun } from "lucide-react";
+import DeclarePanneModal from "../components/modals/DeclarePanneModal.jsx";
 
 export default function ChauffeurDashboardBaticom({ session }) {
   const chauffeurId = session?.user?.id;
@@ -13,7 +13,6 @@ export default function ChauffeurDashboardBaticom({ session }) {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [panneDialog, setPanneDialog] = useState(false);
-
   const [darkMode, setDarkMode] = useState(
     window.matchMedia("(prefers-color-scheme: dark)").matches
   );
@@ -30,7 +29,6 @@ export default function ChauffeurDashboardBaticom({ session }) {
     if (!chauffeurId) return;
 
     setLoading(true);
-    console.log(`Fetching journée pour chauffeurId: ${chauffeurId}`);
 
     const { data, error } = await supabase
       .from("journee_baticom")
@@ -43,7 +41,6 @@ export default function ChauffeurDashboardBaticom({ session }) {
       console.error("Erreur récupération journée :", error.message);
       setJournee(null);
     } else {
-      console.log("Données récupérées :", data);
       setJournee(data);
       if (data) setShowModal(true);
     }
@@ -67,31 +64,6 @@ export default function ChauffeurDashboardBaticom({ session }) {
 
     return () => supabase.removeChannel(channel);
   }, [chauffeurId]);
-
-  // Déclarer une panne
-  const handleDeclarePanne = async () => {
-    if (!journee) return;
-
-    const { error } = await supabase.from("pannes").insert({
-      chauffeur_id: chauffeurId,
-      camion_id: journee.camion_id,
-      journee_id: journee.id,
-      description: "Panne déclarée",
-      created_at: new Date(),
-    });
-
-    if (error) {
-      toast({
-        variant: "destructive",
-        title: "Erreur",
-        description: error.message,
-      });
-      return;
-    }
-
-    toast({ title: "Panne déclarée !" });
-    setPanneDialog(false);
-  };
 
   // Déconnexion
   const handleSignOut = async () => {
@@ -180,7 +152,7 @@ export default function ChauffeurDashboardBaticom({ session }) {
         </Card>
       )}
 
-      {/* MODAL NOUVELLE JOURNEE */}
+      {/* MODAL NOUVELLE JOURNÉE */}
       {showModal && journee && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
           <Card className="w-[400px] p-6 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 shadow-xl">
@@ -211,13 +183,13 @@ export default function ChauffeurDashboardBaticom({ session }) {
         </div>
       )}
 
-      {/* CONFIRMATION PANNE */}
-      <ConfirmDialog
+      {/* MODAL DECLARER PANNE */}
+      <DeclarePanneModal
         open={panneDialog}
-        title="Déclarer une panne"
-        description="Êtes-vous sûr de vouloir déclarer une panne ?"
         onClose={() => setPanneDialog(false)}
-        onConfirm={handleDeclarePanne}
+        chauffeurId={chauffeurId}
+        missionId={journee?.id}
+        structure="BATICOM"
       />
     </div>
   );
