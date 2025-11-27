@@ -21,15 +21,11 @@ export default function OpenDayModalBaticom({
   const [loading, setLoading] = useState(false);
   const [formError, setFormError] = useState(null);
 
-  // 🔵 Filtrer seulement les camions BATICOM disponibles
+  // Filtrer camions disponibles BATICOM
   const baticomCamions = camions.filter(
     (c) => c.structure === "BATICOM" && c.statut === "Disponible"
   );
-
-  // 🔵 Filtrer les chauffeurs BATICOM
-  const baticomChauffeurs = chauffeurs.filter(
-    (c) => c.structure === "BATICOM"
-  );
+  const baticomChauffeurs = chauffeurs.filter((c) => c.structure === "BATICOM");
 
   const handleCreate = async () => {
     setFormError(null);
@@ -42,68 +38,57 @@ export default function OpenDayModalBaticom({
     setLoading(true);
 
     try {
-      // 🔍 Vérifier si une journée ouverte existe DEJA
+      // Vérifier si une journée existante
       const { data: existing, error: checkError } = await supabase
         .from("journee_baticom")
         .select("id")
         .match({
           chauffeur_id: chauffeurId,
-          statut: "ouverte",
+          statut: "affectée",
         });
 
-      if (checkError) {
-        throw new Error(
-          "Erreur lors de la vérification des journées existantes : " +
-            checkError.message
-        );
-      }
+      if (checkError) throw new Error(checkError.message);
 
       if (existing?.length > 0) {
         setFormError(
-          "Ce chauffeur a déjà une journée ouverte. Veuillez la clôturer avant d’en créer une nouvelle."
+          "Ce chauffeur a déjà une journée affectée. Veuillez la clôturer avant d’en créer une nouvelle."
         );
         setLoading(false);
         return;
       }
 
-      // 🆕 Créer la journée
-      const { error: insertError } = await supabase
-        .from("journee_baticom")
-        .insert([
-          {
-            chauffeur_id: chauffeurId,
-            camion_id: camionId,
-            fuel_restant: Number(fuelRestant) || 0,
-            fuel_complement: Number(fuelComplement) || 0,
-            statut: "ouverte",
-            structure: "BATICOM",
-            date: new Date().toISOString().split("T")[0],
-          },
-        ]);
+      // Créer la journée avec statut "affectée"
+      const { error: insertError } = await supabase.from("journee_baticom").insert([
+        {
+          chauffeur_id: chauffeurId,
+          camion_id: camionId,
+          fuel_restant: Number(fuelRestant) || 0,
+          fuel_complement: Number(fuelComplement) || 0,
+          statut: "affectée",
+          structure: "BATICOM",
+          date: new Date().toISOString().split("T")[0],
+        },
+      ]);
 
       if (insertError) throw insertError;
 
-      // 🔄 Mettre le camion en mission
+      // Mettre le camion en mission
       const { error: updateCamionError } = await supabase
         .from("camions")
         .update({ statut: "En mission" })
         .eq("id", camionId);
 
       if (updateCamionError) {
-        console.error(
-          "Erreur mise à jour camion : " + updateCamionError.message
-        );
         toast({
           title: "Alerte",
-          description:
-            "Journée ouverte mais impossible de modifier le statut du camion.",
+          description: "Journée créée mais impossible de modifier le statut du camion.",
           variant: "warning",
         });
       }
 
       toast({
-        title: "🎉 Journée Ouverte",
-        description: "La journée BATICOM a été démarrée avec succès.",
+        title: "🎉 Journée Affectée",
+        description: "La journée BATICOM a été assignée avec succès.",
       });
 
       setShowModal(false);
@@ -158,7 +143,6 @@ export default function OpenDayModalBaticom({
             <label className="block font-medium text-gray-700 dark:text-gray-200 flex items-center gap-2">
               <User size={18} className="text-indigo-500" /> Chauffeur
             </label>
-
             <select
               value={chauffeurId}
               onChange={(e) => setChauffeurId(e.target.value)}
@@ -178,37 +162,29 @@ export default function OpenDayModalBaticom({
             <label className="block font-medium text-gray-700 dark:text-gray-200 flex items-center gap-2">
               <Truck size={18} className="text-indigo-500" /> Camion
             </label>
-
             <select
               value={camionId}
               onChange={(e) => setCamionId(e.target.value)}
               className={BASE_INPUT_STYLE}
             >
-              <option value="">
-                -- Sélectionner un camion BATICOM disponible --
-              </option>
-
+              <option value="">-- Sélectionner un camion BATICOM disponible --</option>
               {baticomCamions.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.immatriculation} ({c.marquemodele})
                 </option>
               ))}
             </select>
-
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              Seuls les camions BATICOM avec le statut "Disponible" sont
-              affichés.
+              Seuls les camions BATICOM avec le statut "Disponible" sont affichés.
             </p>
           </div>
 
           {/* Fuel */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t dark:border-gray-700">
-            {/* Fuel restant */}
             <div className="space-y-1">
               <label className="block font-medium text-gray-700 dark:text-gray-200 flex items-center gap-2">
                 <Fuel size={18} className="text-green-500" /> Fuel restant (L)
               </label>
-
               <input
                 type="number"
                 value={fuelRestant}
@@ -218,13 +194,10 @@ export default function OpenDayModalBaticom({
               />
             </div>
 
-            {/* Fuel complément */}
             <div className="space-y-1">
               <label className="block font-medium text-gray-700 dark:text-gray-200 flex items-center gap-2">
-                <Fuel size={18} className="text-yellow-500" /> Fuel complément
-                (L)
+                <Fuel size={18} className="text-yellow-500" /> Fuel complément (L)
               </label>
-
               <input
                 type="number"
                 value={fuelComplement}

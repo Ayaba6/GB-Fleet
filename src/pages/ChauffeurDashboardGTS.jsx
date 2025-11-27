@@ -5,7 +5,7 @@ import { supabase } from "../config/supabaseClient.js";
 import { ClipboardList, Truck, MessageSquare, LogOut, Clock } from "lucide-react";
 
 import IncidentModalGTS from "../components/modals/IncidentModalGTS.jsx";
-import NewMissionModalGTS from "../components/modals/ChauffeurMissionModalGTS.jsx";
+import NewMissionModalGTS from "../components/modals/NewMissionModalGTS.jsx";
 import HistoriqueGTS from "../components/HistoriqueGTS.jsx";
 import { Button } from "../components/ui/button.jsx";
 import { Loader2 } from "lucide-react";

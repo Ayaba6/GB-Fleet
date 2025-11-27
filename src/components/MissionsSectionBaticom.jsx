@@ -12,11 +12,11 @@ const ITEMS_PER_PAGE = 5;
 const STRUCTURE = "BATICOM";
 const STATUS_CLOSED = "clôturée";
 
-// =====================================
-// ========= CARD COMPOSANT ============
-// =====================================
+// Card Journee
 const CardJournee = ({ journee, chauffeur, camion, onEdit, onClose, onView }) => {
   const isClosed = journee.statut === STATUS_CLOSED;
+  const isAffected = journee.statut === "affectée";
+  const isInProgress = journee.statut === "en cours";
 
   return (
     <Card className="shadow-lg p-4 bg-white/70 dark:bg-gray-800/70 border border-gray-200 dark:border-gray-700 backdrop-blur-sm">
@@ -44,8 +44,11 @@ const CardJournee = ({ journee, chauffeur, camion, onEdit, onClose, onView }) =>
             className={`text-xs font-semibold rounded-full p-1 text-center ${
               isClosed
                 ? "bg-green-600 text-white"
+                : isInProgress
+                ? "bg-blue-600 text-white"
                 : "bg-yellow-600 text-white"
-            }`}>
+            }`}
+          >
             {journee.statut}
           </span>
         </div>
@@ -53,7 +56,15 @@ const CardJournee = ({ journee, chauffeur, camion, onEdit, onClose, onView }) =>
 
       {/* ACTIONS */}
       <div className="flex justify-end gap-2 mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
-        {!isClosed ? (
+        {isClosed ? (
+          <Button
+            size="sm"
+            className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-1"
+            onClick={() => onView(journee)}
+          >
+            <Eye size={14} /> Détails
+          </Button>
+        ) : (
           <>
             <Button
               size="sm"
@@ -71,23 +82,13 @@ const CardJournee = ({ journee, chauffeur, camion, onEdit, onClose, onView }) =>
               <Lock size={14} /> Clôturer
             </Button>
           </>
-        ) : (
-          <Button
-            size="sm"
-            className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-1"
-            onClick={() => onView(journee)}
-          >
-            <Eye size={14} /> Détails
-          </Button>
         )}
       </div>
     </Card>
   );
 };
 
-// =====================================
-// ========= MAIN COMPONENT ============
-// =====================================
+// Main Section
 export default function MissionsSectionBaticom() {
   const [showModal, setShowModal] = useState(false);
   const [editJournee, setEditJournee] = useState(null);
@@ -102,16 +103,12 @@ export default function MissionsSectionBaticom() {
   const [sortOrder, setSortOrder] = useState("desc");
   const [isLoading, setIsLoading] = useState(true);
 
-  // =====================================
-  // === FETCH FUNCTIONS =================
-  // =====================================
   const fetchChauffeurs = useCallback(async () => {
     const { data } = await supabase
       .from("profiles")
       .select("id, name, role, structure")
       .eq("role", "chauffeur")
       .eq("structure", STRUCTURE);
-
     setChauffeurs(data || []);
   }, []);
 
@@ -120,19 +117,16 @@ export default function MissionsSectionBaticom() {
       .from("camions")
       .select("id, immatriculation, structure, statut, marquemodele")
       .eq("structure", STRUCTURE);
-
     setCamions(data || []);
   }, []);
 
   const fetchJournees = useCallback(async () => {
     setIsLoading(true);
-
     const { data } = await supabase
-      .from("journee_baticom") // ← TABLE CORRIGÉE
+      .from("journee_baticom")
       .select("*")
       .eq("structure", STRUCTURE)
       .order("id", { ascending: false });
-
     setJournees(data || []);
     setIsLoading(false);
   }, []);
@@ -143,15 +137,11 @@ export default function MissionsSectionBaticom() {
     fetchJournees();
   }, [fetchChauffeurs, fetchCamions, fetchJournees]);
 
-  // =====================================
-  // === CLÔTURE D’UNE JOURNÉE ==========
-  // =====================================
   const handleCloseJournee = async (id) => {
     await supabase
       .from("journee_baticom")
       .update({ statut: STATUS_CLOSED })
       .eq("id", id);
-
     fetchJournees();
   };
 
@@ -166,43 +156,32 @@ export default function MissionsSectionBaticom() {
     setSelectedJourneeId(null);
   };
 
-  // =====================================
-  // === FILTRAGE + TRI + PAGINATION =====
-  // =====================================
   const { paginatedJournees, totalPages } = useMemo(() => {
     const filtered = journees.filter((j) => {
       const chauffeur = chauffeurs.find((c) => c.id === j.chauffeur_id);
       const camion = camions.find((c) => c.id === j.camion_id);
       const lower = searchTerm.toLowerCase();
-
       return (
         chauffeur?.name?.toLowerCase().includes(lower) ||
         camion?.immatriculation?.toLowerCase().includes(lower) ||
         (j.date || "").includes(lower)
       );
     });
-
     const sorted = [...filtered].sort((a, b) =>
       sortOrder === "asc"
         ? new Date(a.date) - new Date(b.date)
         : new Date(b.date) - new Date(a.date)
     );
-
     const totalPages = Math.ceil(sorted.length / ITEMS_PER_PAGE);
     const paginated = sorted.slice(
       (currentPage - 1) * ITEMS_PER_PAGE,
       currentPage * ITEMS_PER_PAGE
     );
-
     return { paginatedJournees: paginated, totalPages };
   }, [journees, chauffeurs, camions, searchTerm, sortOrder, currentPage]);
 
-  // =====================================
-  // ========== RENDER ===================
-  // =====================================
   return (
     <div className="p-3 sm:p-6 space-y-6 container animate-fadeInUp">
-
       {/* Header */}
       <Card className="shadow-lg bg-white/80 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 backdrop-blur-sm">
         <CardHeader className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
@@ -210,7 +189,6 @@ export default function MissionsSectionBaticom() {
             <Calendar size={24} className="text-blue-600" />
             Gestion des Journées BATICOM
           </h2>
-
           <Button
             onClick={() => setShowModal(true)}
             className="bg-blue-600 hover:bg-blue-700 text-white">
@@ -231,11 +209,10 @@ export default function MissionsSectionBaticom() {
           }}
           className="flex-1 min-w-[200px] border px-2 py-1 rounded bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200"
         />
-
         {isLoading && <Loader2 className="animate-spin text-blue-500" size={24} />}
       </div>
 
-      {/* LISTE DES CARDS */}
+      {/* Liste des cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {isLoading
           ? Array.from({ length: ITEMS_PER_PAGE }).map((_, i) => (
@@ -261,7 +238,7 @@ export default function MissionsSectionBaticom() {
             })}
       </div>
 
-      {/* PAGINATION */}
+      {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex justify-center gap-2 mt-4">
           {Array.from({ length: totalPages }, (_, i) => (
@@ -278,7 +255,7 @@ export default function MissionsSectionBaticom() {
         </div>
       )}
 
-      {/* MODALS */}
+      {/* Modals */}
       {showModal && (
         <OpenDayModalBaticom
           setShowModal={setShowModal}
@@ -287,7 +264,6 @@ export default function MissionsSectionBaticom() {
           camions={camions}
         />
       )}
-
       {editJournee && (
         <EditDayModalBaticom
           editingJournee={editJournee}
@@ -295,7 +271,6 @@ export default function MissionsSectionBaticom() {
           fetchJournees={fetchJournees}
         />
       )}
-
       {detailsJournee && (
         <DetailsJourneeModal
           journee={detailsJournee}
