@@ -2,89 +2,67 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "../config/supabaseClient.js";
 import { Button } from "./ui/button.jsx";
 import { Card, CardHeader } from "./ui/card.jsx";
-import {
-  Pencil,
-  Lock,
-  Eye,
-  Loader2,
-  User,
-  Truck,
-  Calendar,
-  DollarSign
-} from "lucide-react";
+import { Pencil, Lock, Eye, Loader2, User, Truck, Calendar } from "lucide-react";
 import OpenMissionModalGTS from "./modals/OpenMissionModalGTS.jsx";
 import EditMissionModalGTS from "./modals/EditMissionModalGTS.jsx";
 import DetailsMissionModalGTS from "./modals/DetailsMissionModalGTS.jsx";
 
-const ITEMS_PER_PAGE = 5;
+const ITEMS_PER_PAGE = 10;
 const STRUCTURE = "GTS";
 const STATUS_CLOSED = "Clôturée";
 
-/* -------------------------------------------------------------
-   CARD MISSION — TOUT TEXTE LISIBLE MODE CLAIR & SOMBRE
-------------------------------------------------------------- */
+/* ---------------------------
+   CARD MISSION — STYLE BATICOM
+--------------------------- */
 const CardMissionGTS = ({ mission, chauffeur, camion, onEdit, onClose, onView }) => {
   const isClosed = mission.statut === STATUS_CLOSED;
-
-  const textClass = "text-gray-900 dark:text-gray-100";         
-  const subTextClass = "text-gray-700 dark:text-gray-300";       
+  const textClass = "text-gray-900 dark:text-gray-100 text-base";  // police réduite
+  const subTextClass = "text-gray-700 dark:text-gray-300 text-sm"; // police réduite
 
   return (
-    <Card className="relative shadow-lg bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 p-5 rounded-2xl hover:shadow-2xl transition">
+    <Card className="shadow-lg p-4 bg-white/70 dark:bg-gray-800/70 border border-gray-200 dark:border-gray-700 rounded-xl backdrop-blur-sm relative">
 
       {/* Badge statut */}
       <span
-        className={`absolute top-4 right-4 px-3 py-1 text-xs font-semibold rounded-full shadow-sm ${
-          isClosed
-            ? "bg-green-200 text-green-900 dark:bg-green-700 dark:text-green-100"
-            : "bg-yellow-200 text-yellow-900 dark:bg-yellow-700 dark:text-yellow-100"
-        }`}
+        className={`text-xs font-semibold rounded-full p-1 text-center ${
+          isClosed ? "bg-green-600 text-white" : "bg-yellow-600 text-white"
+        } absolute top-4 right-4`}
       >
         {mission.statut}
       </span>
 
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-2">
 
         {/* Chauffeur */}
         <div className="flex items-center gap-2">
           <User className="text-indigo-600 w-5 h-5" />
-          <p className={`font-semibold text-lg ${textClass}`}>
-            {chauffeur?.name || "N/A"}
-          </p>
+          <p className={`font-semibold ${textClass}`}>{chauffeur?.name || "N/A"}</p>
         </div>
 
         {/* Camion */}
         <div className="flex items-center gap-2">
           <Truck className="text-blue-600 w-5 h-5" />
-          <p className={`font-medium ${subTextClass}`}>
-            {camion?.immatriculation || "N/A"}
-          </p>
+          <p className={`font-medium ${subTextClass}`}>{camion?.immatriculation || "N/A"}</p>
         </div>
 
         {/* Date */}
         <div className="flex items-center gap-2">
           <Calendar className="text-green-600 w-5 h-5" />
-          <p className={subTextClass}>
-            {mission.date ? new Date(mission.date).toLocaleDateString() : "N/A"}
-          </p>
+          <p className={subTextClass}>{mission.date ? new Date(mission.date).toLocaleDateString() : "N/A"}</p>
         </div>
 
-        {/* Frais */}
-        <div className="flex flex-wrap gap-3">
+        {/* Frais FCFA */}
+        <div className="flex flex-wrap gap-3 mt-1">
           <div className="flex items-center gap-1 bg-gray-200 dark:bg-gray-700 px-2 py-1 rounded-md text-sm text-gray-800 dark:text-gray-200">
-            <DollarSign className="w-4 h-4 text-green-700" /> 
-            {mission.frais_fuel || 0} DH Fuel
+            {(mission.frais_fuel || 0).toLocaleString("fr-FR")} FCFA Fuel
           </div>
-
           <div className="flex items-center gap-1 bg-gray-200 dark:bg-gray-700 px-2 py-1 rounded-md text-sm text-gray-800 dark:text-gray-200">
-            <DollarSign className="w-4 h-4 text-red-700" />
-            {mission.frais_mission || 0} DH Mission
+            {(mission.frais_mission || 0).toLocaleString("fr-FR")} FCFA Mission
           </div>
         </div>
 
         {/* Actions */}
         <div className="flex gap-2 mt-3 flex-wrap">
-
           {!isClosed ? (
             <>
               <Button
@@ -112,16 +90,16 @@ const CardMissionGTS = ({ mission, chauffeur, camion, onEdit, onClose, onView })
               <Eye size={16} /> Détails
             </Button>
           )}
-
         </div>
+
       </div>
     </Card>
   );
 };
 
-/* -------------------------------------------------------------
-   MODAL CONFIRMATION
-------------------------------------------------------------- */
+/* ---------------------------
+   CONFIRMATION MODAL
+--------------------------- */
 const ConfirmationModal = ({ isOpen, onClose, onConfirm, message }) => {
   if (!isOpen) return null;
   return (
@@ -137,11 +115,10 @@ const ConfirmationModal = ({ isOpen, onClose, onConfirm, message }) => {
   );
 };
 
-/* -------------------------------------------------------------
+/* ---------------------------
    MAIN COMPONENT — MissionsSectionGTS
-------------------------------------------------------------- */
+--------------------------- */
 export default function MissionsSectionGTS() {
-
   const [showModal, setShowModal] = useState(false);
   const [editMission, setEditMission] = useState(null);
   const [detailsMission, setDetailsMission] = useState(null);
@@ -156,10 +133,9 @@ export default function MissionsSectionGTS() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [selectedMissionId, setSelectedMissionId] = useState(null);
 
-  const [sortOrder, setSortOrder] = useState("desc");
   const [isLoading, setIsLoading] = useState(true);
 
-  /* Fetch Data */
+  /* Fetch data */
   const fetchChauffeurs = useCallback(async () => {
     const { data } = await supabase
       .from("profiles")
@@ -194,11 +170,7 @@ export default function MissionsSectionGTS() {
     fetchMissions();
   }, [fetchChauffeurs, fetchCamions, fetchMissions]);
 
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm]);
-
-  /* Close Mission */
+  /* Close mission */
   const handleCloseMission = async (id) => {
     const today = new Date().toISOString().split("T")[0];
     await supabase
@@ -225,7 +197,6 @@ export default function MissionsSectionGTS() {
       const chauffeur = chauffeurs.find((c) => c.id === m.chauffeur_id);
       const camion = camions.find((c) => c.id === m.camion_id);
       const lower = searchTerm.toLowerCase();
-
       return (
         chauffeur?.name?.toLowerCase().includes(lower) ||
         camion?.immatriculation?.toLowerCase().includes(lower) ||
@@ -233,11 +204,7 @@ export default function MissionsSectionGTS() {
       );
     });
 
-    const sorted = [...filtered].sort((a, b) =>
-      sortOrder === "asc"
-        ? new Date(a.date) - new Date(b.date)
-        : new Date(b.date) - new Date(a.date)
-    );
+    const sorted = [...filtered].sort((a, b) => new Date(b.date) - new Date(a.date));
 
     const totalPages = Math.ceil(sorted.length / ITEMS_PER_PAGE);
     const paginated = sorted.slice(
@@ -246,11 +213,8 @@ export default function MissionsSectionGTS() {
     );
 
     return { paginatedMissions: paginated, totalPages };
-  }, [missions, chauffeurs, camions, searchTerm, sortOrder, currentPage]);
+  }, [missions, chauffeurs, camions, searchTerm, currentPage]);
 
-  /* -------------------------------------------------------------
-     RENDER
-  ------------------------------------------------------------- */
   return (
     <div className="flex-1 flex flex-col space-y-6 px-4 md:px-6 py-6 animate-fadeInUp">
 
@@ -277,34 +241,22 @@ export default function MissionsSectionGTS() {
           placeholder="🔍 Rechercher chauffeur, camion ou date..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full sm:w-64 border border-gray-300 dark:border-gray-600
-          rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-gray-200
-          text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full sm:w-64 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-gray-200 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
-
         {isLoading && <Loader2 className="animate-spin text-blue-500" size={24} />}
       </div>
 
       {/* Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-
         {isLoading
           ? Array.from({ length: ITEMS_PER_PAGE }).map((_, i) => (
-              <Card
-                key={i}
-                className="p-4 animate-pulse bg-gray-100 dark:bg-gray-700 h-40 rounded-xl shadow-sm"
-              />
+              <Card key={i} className="p-4 animate-pulse bg-gray-100 dark:bg-gray-700 h-40 rounded-xl shadow-sm" />
             ))
           : paginatedMissions.length === 0
-          ? (
-            <p className="col-span-full text-center text-gray-900 dark:text-gray-400">
-              Aucune mission trouvée.
-            </p>
-          )
+          ? <p className="col-span-full text-center text-gray-900 dark:text-gray-400">Aucune mission trouvée.</p>
           : paginatedMissions.map((m) => {
               const chauffeur = chauffeurs.find((c) => c.id === m.chauffeur_id);
               const camion = camions.find((c) => c.id === m.camion_id);
-
               return (
                 <CardMissionGTS
                   key={m.id}
@@ -328,11 +280,9 @@ export default function MissionsSectionGTS() {
               size="sm"
               variant={i + 1 === currentPage ? "default" : "outline"}
               onClick={() => setCurrentPage(i + 1)}
-              className={
-                i + 1 === currentPage
-                  ? "bg-blue-600 hover:bg-blue-700 text-white dark:bg-blue-500 dark:hover:bg-blue-600"
-                  : "text-gray-900 dark:text-gray-200"
-              }
+              className={i + 1 === currentPage
+                ? "bg-blue-600 hover:bg-blue-700 text-white dark:bg-blue-500 dark:hover:bg-blue-600"
+                : "text-gray-900 dark:text-gray-200"}
             >
               {i + 1}
             </Button>
@@ -342,27 +292,13 @@ export default function MissionsSectionGTS() {
 
       {/* Modals */}
       {showModal && (
-        <OpenMissionModalGTS
-          setShowModal={setShowModal}
-          fetchMissions={fetchMissions}
-          chauffeurs={chauffeurs}
-          camions={camions}
-        />
+        <OpenMissionModalGTS setShowModal={setShowModal} fetchMissions={fetchMissions} chauffeurs={chauffeurs} camions={camions} />
       )}
-
       {editMission && (
-        <EditMissionModalGTS
-          editingMission={editMission}
-          setShowModal={setEditMission}
-          fetchMissions={fetchMissions}
-        />
+        <EditMissionModalGTS editingMission={editMission} setShowModal={setEditMission} fetchMissions={fetchMissions} />
       )}
-
       {detailsMission && (
-        <DetailsMissionModalGTS
-          mission={detailsMission}
-          setShowModal={setDetailsMission}
-        />
+        <DetailsMissionModalGTS mission={detailsMission} setShowModal={setDetailsMission} />
       )}
 
       <ConfirmationModal
@@ -371,6 +307,7 @@ export default function MissionsSectionGTS() {
         onConfirm={confirmClose}
         message="Voulez-vous vraiment clôturer cette mission ?"
       />
+
     </div>
   );
 }

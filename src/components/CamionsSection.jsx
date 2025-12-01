@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../config/supabaseClient.js";
 import { Button } from "../components/ui/button.jsx";
-import { Card, CardHeader, CardContent } from "../components/ui/card.jsx";
+import { Card, CardHeader } from "../components/ui/card.jsx";
 import { useToast } from "../components/ui/use-toast.jsx";
 import ConfirmDialog from "../components/ui/ConfirmDialog.jsx";
 import CamionModal from "./modals/CamionModal.jsx";
@@ -16,6 +16,7 @@ const getStatusBadge = (statut) => {
     Disponible: "bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100",
     "En maintenance": "bg-yellow-100 text-yellow-800 dark:bg-yellow-800 dark:text-yellow-100",
     Indisponible: "bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100",
+    Mission: "bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100",
   };
   return (
     <span className={`px-2 py-1 text-xs font-semibold rounded-full capitalize ${colors[statut] || "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200"}`}>
@@ -62,7 +63,7 @@ export default function CamionsSection() {
   const [statutFilter, setStatutFilter] = useState("");
   const [structureFilter, setStructureFilter] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const ITEMS_PER_PAGE = 5;
+  const ITEMS_PER_PAGE = 10;
 
   const fetchCamions = useCallback(async () => {
     const { data, error } = await supabase.from("camions").select("*").order("inserted_at", { ascending: false });
@@ -87,6 +88,21 @@ export default function CamionsSection() {
 
   const handleEdit = (c) => { setEditingCamion(c); setShowModal(true); };
   const handleAdd = () => { setEditingCamion(null); setShowModal(true); };
+
+  // Fonction pour passer tous les camions en Mission à Disponible
+  const updateMissionsToDisponible = async () => {
+    try {
+      const { error } = await supabase
+        .from("camions")
+        .update({ statut: "Disponible" })
+        .eq("statut", "Mission");
+      if (error) throw error;
+      toast({ title: "Mise à jour", description: "Tous les camions en mission sont maintenant disponibles." });
+      fetchCamions();
+    } catch (err) {
+      toast({ title: "Erreur", description: err.message, variant: "destructive" });
+    }
+  };
 
   const filteredCamions = camions.filter(
     (c) =>
@@ -145,9 +161,14 @@ export default function CamionsSection() {
           <h2 className="text-xl sm:text-2xl font-bold text-gray-800 dark:text-gray-100 flex items-center gap-3">
             <Truck size={24} className="text-blue-600 dark:text-blue-400" /> Gestion de la Flotte
           </h2>
-          <Button onClick={handleAdd} className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white">
-            + Créer Camion
-          </Button>
+          <div className="flex gap-2">
+            <Button onClick={handleAdd} className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white">
+              + Créer Camion
+            </Button>
+            <Button onClick={updateMissionsToDisponible} className="bg-green-600 hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600 text-white">
+              Clôturer la journée
+            </Button>
+          </div>
         </CardHeader>
       </Card>
 
@@ -182,6 +203,7 @@ export default function CamionsSection() {
           <option value="Disponible">Disponible</option>
           <option value="En maintenance">En maintenance</option>
           <option value="Indisponible">Indisponible</option>
+          <option value="Mission">Mission</option>
         </select>
 
         <select
