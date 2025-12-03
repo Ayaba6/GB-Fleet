@@ -25,7 +25,7 @@ import {
 
 // Imports des composants spécifiques
 import DeclarePanneModal from "../components/modals/DeclarePanneModal.jsx";
-import HistoriqueJourneeChauffeur from "../components/HistoriqueJourneeChauffeur.jsx"; 
+import HistoriqueJourneeChauffeur from "../components/HistoriqueJourneeChauffeur.jsx"; 
 
 // --- Header fixe ---
 const DashboardHeader = ({
@@ -236,7 +236,7 @@ const DashboardContent = ({ journee, voyages, handleStartDay, handleCloseDay, se
 // --- Composant Principal ---
 export default function ChauffeurDashboardBaticom({ session }) {
     // L'ID du chauffeur est tiré de la session
-    const chauffeurId = session?.user?.id; 
+    const chauffeurId = session?.user?.id; 
     const { toast } = useToast();
 
     const [journee, setJournee] = useState(null);
@@ -432,8 +432,16 @@ export default function ChauffeurDashboardBaticom({ session }) {
 
             <BottomNavigation activeTab={activeTab} setActiveTab={setActiveTab} />
 
-            {/* Modal de déclaration de panne */}
-            {panneDialog && <DeclarePanneModal journee={journee} onClose={() => setPanneDialog(false)} />}
+            {/* Modal de déclaration de panne : CORRECTION APPLIQUÉE ICI 👇 */}
+            {panneDialog && (
+                <DeclarePanneModal 
+                    open={panneDialog} 
+                    onClose={() => setPanneDialog(false)} 
+                    chauffeurId={chauffeurId} // L'ID du chauffeur est envoyé
+                    missionId={journee?.id || null} // L'ID de la journée en cours est envoyé comme missionId
+                    structure="baticom" // La structure est spécifiée
+                />
+            )}
         </div>
     );
 }
