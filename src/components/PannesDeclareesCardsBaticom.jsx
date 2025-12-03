@@ -21,7 +21,7 @@ export default function PannesDeclareesCardsBaticom() {
   const [showPhotoModal, setShowPhotoModal] = useState(false);
   const [showModalConfirm, setShowModalConfirm] = useState(false);
   const [panneToDelete, setPanneToDelete] = useState(null);
-  const ITEMS_PER_PAGE = 6;
+  const ITEMS_PER_PAGE = 10;
 
   // --- Récupération des pannes et chauffeurs + Realtime ---
   useEffect(() => {
