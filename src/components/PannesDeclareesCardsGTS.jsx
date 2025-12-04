@@ -1,14 +1,16 @@
-// src/components/PannesDeclareesCardsGts.jsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { supabase } from "../config/supabaseClient.js";
-import { Card, CardHeader } from "./ui/card.jsx";
+import { Card, CardHeader, CardContent } from "./ui/card.jsx";
 import { Button } from "./ui/button.jsx";
 import { useToast } from "./ui/use-toast.jsx";
 import ConfirmDialog from "./ui/ConfirmDialog.jsx";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { Bell, MapPin, FileText, File, X } from "lucide-react";
+import { 
+  Bell, MapPin, FileText, File, X, Wrench, CheckCircle, AlertTriangle, Loader2,
+  User, Clock, Calendar, Trash2
+} from "lucide-react";
 
 export default function PannesDeclareesCardsGts() {
   const STRUCTURE = "GTS";
@@ -22,46 +24,70 @@ export default function PannesDeclareesCardsGts() {
   const [showPhotoModal, setShowPhotoModal] = useState(false);
   const [showModalConfirm, setShowModalConfirm] = useState(false);
   const [panneToDelete, setPanneToDelete] = useState(null);
-  const ITEMS_PER_PAGE = 6;
+  const [isLoading, setIsLoading] = useState(true);
+  const ITEMS_PER_PAGE = 9;
 
+  // --- Formatage date / heure ---
+  const formatDateAsId = (dateString) => {
+    if (!dateString) return "N/A";
+    const date = new Date(dateString);
+    return date.toLocaleDateString("fr-FR");
+  };
+
+  const formatTime = (dateString) => {
+    if (!dateString) return "N/A";
+    const date = new Date(dateString);
+    return date.toLocaleTimeString("fr-FR", { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  };
+
+  // --- Récupération des données + Realtime ---
   useEffect(() => {
     const fetchData = async () => {
-      const { data: chauffeursData } = await supabase
+      setIsLoading(true);
+      const { data: chauffeursData, error: chauffeursError } = await supabase
         .from("users")
-        .select("*")
+        .select("id, name")
         .eq("role", "chauffeur")
         .eq("structure", STRUCTURE);
 
-      const { data: pannesData } = await supabase
+      const { data: pannesData, error: pannesError } = await supabase
         .from("alertespannes")
         .select("*")
         .eq("structure", STRUCTURE)
         .order("created_at", { ascending: false });
 
+      if (chauffeursError) console.error("Erreur chargement chauffeurs:", chauffeursError);
+      if (pannesError) console.error("Erreur chargement pannes:", pannesError);
+
       setChauffeurs(chauffeursData || []);
       setPannes(pannesData || []);
+      setIsLoading(false);
     };
 
     fetchData();
 
     const channel = supabase
       .channel(`pannes-${STRUCTURE}`)
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "alertespannes" },
-        (payload) => {
-          if (payload.new.structure === STRUCTURE) {
-            setPannes(prev => [payload.new, ...prev]);
-            toast(`Nouvelle panne : ${payload.new.typepanne}`, { duration: 5000 });
-          }
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "alertespannes" }, (payload) => {
+        if (payload.new.structure === STRUCTURE) {
+          setPannes(prev => [payload.new, ...prev]);
+          toast({ title: "Nouvelle Alerte", description: `Panne : ${payload.new.typepanne}`, duration: 5000 });
         }
-      )
+      })
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "alertespannes" }, (payload) => {
+        if (payload.new.structure === STRUCTURE) {
+          setPannes(prev => prev.map(p => (p.id === payload.new.id ? payload.new : p)));
+        }
+      })
+      .on("postgres_changes", { event: "DELETE", schema: "public", table: "alertespannes" }, (payload) => {
+        setPannes(prev => prev.filter(p => p.id !== payload.old.id));
+      })
       .subscribe();
 
     return () => supabase.removeChannel(channel);
   }, [toast]);
 
-  const getChauffeurName = (id) => chauffeurs.find(c => c.id === id)?.name || "Inconnu";
+  const getChauffeurName = useCallback((id) => chauffeurs.find(c => c.id === id)?.name || "Inconnu", [chauffeurs]);
 
   const getPhotoUrl = (panne) => {
     if (!panne.photo) return null;
@@ -69,7 +95,10 @@ export default function PannesDeclareesCardsGts() {
     return data.publicUrl;
   };
 
+  // --- Actions ---
   const handleTraiterPanne = async (panne) => {
+    if (panne.statut === "resolu") return;
+
     const { error } = await supabase
       .from("alertespannes")
       .update({ statut: "resolu" })
@@ -78,36 +107,46 @@ export default function PannesDeclareesCardsGts() {
     if (error) {
       toast({ title: "Erreur", description: error.message, variant: "destructive" });
     } else {
-      setPannes(prev => prev.map(p => (p.id === panne.id ? { ...p, statut: "resolu" } : p)));
-      toast({ title: "Panne traitée", description: `"${panne.typepanne}" a été résolue.` });
+      toast({ title: "Panne traitée", description: `"${panne.typepanne}" a été résolue.`, duration: 3000 });
     }
   };
 
   const confirmDelete = async () => {
     try {
-      await supabase.from("alertespannes").delete().eq("id", panneToDelete.id);
-      toast({ title: "Panne supprimée", description: `"${panneToDelete.typepanne}" a été supprimée.` });
+      if (panneToDelete?.photo) {
+        const { error: storageError } = await supabase.storage.from("pannes").remove([panneToDelete.photo]);
+        if (storageError) console.error("Erreur suppression photo:", storageError);
+      }
+
+      const { error: dbError } = await supabase.from("alertespannes").delete().eq("id", panneToDelete.id);
+      if (dbError) throw dbError;
+
+      toast({ title: "Panne supprimée", description: `"${panneToDelete.typepanne}" a été supprimée.`, duration: 3000 });
       setShowModalConfirm(false);
       setPanneToDelete(null);
-      setPannes(prev => prev.filter(p => p.id !== panneToDelete.id));
     } catch (err) {
       toast({ title: "Erreur", description: err.message, variant: "destructive" });
     }
   };
 
+  // --- Filtrage & Pagination ---
   const filteredPannes = pannes.filter(p => {
     const matchFilter = filter === "toutes" ? true : p.statut === filter;
+    const searchString = search.toLowerCase();
     const matchSearch =
-      (p.mission_id?.toString() || "").includes(search.toLowerCase()) ||
-      (p.description || "").toLowerCase().includes(search.toLowerCase()) ||
-      (p.typepanne || "").toLowerCase().includes(search.toLowerCase()) ||
-      getChauffeurName(p.chauffeur_id).toLowerCase().includes(search.toLowerCase());
+      (p.mission_id?.toString() || "").toLowerCase().includes(searchString) ||
+      (p.description || "").toLowerCase().includes(searchString) ||
+      (p.typepanne || "").toLowerCase().includes(searchString) ||
+      getChauffeurName(p.chauffeur_id).toLowerCase().includes(searchString) ||
+      (p.created_at ? formatDateAsId(p.created_at).includes(searchString) : false) ||
+      (p.created_at ? formatTime(p.created_at).includes(searchString) : false);
     return matchFilter && matchSearch;
   });
 
   const totalPages = Math.ceil(filteredPannes.length / ITEMS_PER_PAGE);
   const paginatedPannes = filteredPannes.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
+  // --- Export Excel / PDF ---
   const exportExcel = () => {
     const wsData = filteredPannes.map(p => ({
       Mission: p.mission_id || "N/A",
@@ -153,6 +192,7 @@ export default function PannesDeclareesCardsGts() {
     toast({ title: "Export PDF", description: "Document généré." });
   };
 
+  // --- Badge Statut ---
   const getStatusBadge = (statut) => {
     const colors = {
       en_cours: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
@@ -160,15 +200,20 @@ export default function PannesDeclareesCardsGts() {
       signale: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
     };
     const labels = { en_cours: "En cours", resolu: "Résolu", signale: "Signalé" };
+    const Icon = statut === 'resolu' ? CheckCircle : statut === 'en_cours' ? AlertTriangle : Wrench;
+
     return (
-      <span className={`inline-flex items-center gap-1 px-2 py-1 text-sm font-medium rounded-full ${colors[statut] || "bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200"}`}>
+      <span className={`inline-flex items-center gap-1 px-3 py-1 text-xs font-semibold rounded-full ${colors[statut] || "bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200"}`}>
+        <Icon size={14} />
         {labels[statut] || statut}
       </span>
     );
   };
 
+  // --- RENDER ---
   return (
     <div className="p-4 sm:p-6 space-y-6 container max-w-[1440px] mx-auto">
+      
       {/* Header */}
       <Card className="shadow-xl bg-white/90 dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
         <CardHeader className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 sm:p-6 gap-2 sm:gap-0">
@@ -176,113 +221,167 @@ export default function PannesDeclareesCardsGts() {
             <Bell size={24} className="text-red-600" /> Gestion des Pannes GTS
           </h2>
           <div className="flex gap-2 flex-wrap">
-            <Button onClick={exportExcel} variant="outline" className="flex items-center gap-1 border-green-500 text-green-600 dark:text-green-400 dark:border-green-600 hover:bg-green-50 dark:hover:bg-green-900/30">
-              <File size={16} /> Excel
+            <Button onClick={exportExcel} variant="outline" className="flex items-center gap-1 border-green-500 text-green-600 dark:text-green-400 dark:border-green-600 hover:bg-green-50 dark:hover:bg-green-900/30 hover:text-green-700 dark:hover:text-green-200">
+              <File size={16} /> Export Excel
             </Button>
-            <Button onClick={exportPDF} variant="outline" className="flex items-center gap-1 border-red-500 text-red-600 dark:text-red-400 dark:border-red-600 hover:bg-red-50 dark:hover:bg-red-900/30">
-              <FileText size={16} /> PDF
+            <Button onClick={exportPDF} variant="outline" className="flex items-center gap-1 border-red-500 text-red-600 dark:text-red-400 dark:border-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 hover:text-red-700 dark:hover:text-red-200">
+              <FileText size={16} /> Export PDF
             </Button>
           </div>
         </CardHeader>
       </Card>
 
+      <hr className="my-4"/>
+
       {/* Filtre + Recherche */}
       <div className="flex flex-wrap gap-3 items-center justify-between bg-white dark:bg-gray-800 p-4 rounded-xl shadow border border-gray-100 dark:border-gray-700">
         <input
           type="text"
-          placeholder="🔍 Rechercher..."
+          placeholder="🔍 Rechercher (Journée, Chauffeur, Type, Heure...)"
           value={search}
           onChange={e => { setSearch(e.target.value); setCurrentPage(1); }}
-          className="flex-1 min-w-[150px] border border-gray-300 dark:border-gray-600 rounded px-3 py-2 dark:bg-gray-700 dark:text-gray-200"
+          className="flex-1 min-w-[200px] border border-gray-300 dark:border-gray-600 rounded px-3 py-2 dark:bg-gray-700 dark:text-gray-200 placeholder:text-gray-500 dark:placeholder:text-gray-400 focus:ring-blue-500 focus:border-blue-500 outline-none"
         />
         <select
           value={filter}
           onChange={e => { setFilter(e.target.value); setCurrentPage(1); }}
-          className="border rounded px-3 py-2 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600"
+          className="border rounded px-3 py-2 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600 outline-none"
         >
           <option value="toutes">Toutes</option>
           <option value="en_cours">En cours</option>
           <option value="resolu">Résolu</option>
           <option value="signale">Signalé</option>
         </select>
+        {pannes.length > 0 && (
+          <span className="text-sm text-gray-500 dark:text-gray-400">Affiché: **{filteredPannes.length}** pannes</span>
+        )}
       </div>
 
+      <hr className="my-4"/>
+
       {/* Liste des pannes */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {paginatedPannes.length === 0 ? (
-          <p className="text-center col-span-full text-gray-500 dark:text-gray-400">Aucune panne trouvée</p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        {isLoading ? (
+          <div className="col-span-full flex justify-center items-center p-20 text-blue-500 dark:text-blue-400">
+            <Loader2 className="animate-spin mr-2" size={24} />
+            <span>Chargement des données...</span>
+          </div>
+        ) : paginatedPannes.length === 0 ? (
+          <p className="text-center col-span-full text-gray-500 dark:text-gray-400 p-10 bg-white dark:bg-gray-800 rounded-xl shadow">Aucune panne trouvée avec les filtres actuels</p>
         ) : paginatedPannes.map(p => (
-          <Card key={p.id} className="shadow-lg p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 flex flex-col justify-between">
-            <div className="flex flex-col gap-2">
-              <h3 className="font-bold text-lg text-gray-800 dark:text-white">{getChauffeurName(p.chauffeur_id)}</h3>
-              <p className="text-sm text-gray-600 dark:text-gray-300">Mission: {p.mission_id || "N/A"}</p>
-              <p className="text-sm text-gray-600 dark:text-gray-300">Type: {p.typepanne}</p>
-              <p className="text-sm text-gray-600 dark:text-gray-300 truncate max-w-full">Description: {p.description}</p>
-              <p className="text-sm mt-1">{getStatusBadge(p.statut)}</p>
-            </div>
-            <div className="flex flex-wrap gap-2 mt-3">
-              {p.latitude && p.longitude && (
-                <a href={`https://www.google.com/maps/search/?api=1&query=${p.latitude},${p.longitude}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1">
-                  <MapPin size={14}/> Position
-                </a>
-              )}
-              {p.photo && (
-                <Button size="sm" variant="outline" onClick={() => { setSelectedPanne(p); setShowPhotoModal(true); }}>
-                  Voir photo
-                </Button>
-              )}
-              <Button size="sm" variant="destructive" onClick={() => { setPanneToDelete(p); setShowModalConfirm(true); }}>
-                Supprimer
-              </Button>
-              {p.statut !== "resolu" && (
-                <Button
-                  size="sm"
-                  variant="default"
-                  className="whitespace-nowrap border-blue-500 text-blue-700 dark:border-blue-400 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-700"
-                  onClick={() => handleTraiterPanne(p)}
+          <Card key={p.id} className="shadow-lg p-5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 flex flex-col justify-between hover:shadow-xl transition duration-300">
+            <CardContent className="p-0 space-y-3">
+              
+              {/* Statut et Type */}
+              <div className="flex justify-between items-center pb-2 border-b border-gray-100 dark:border-gray-700/50">
+                  {getStatusBadge(p.statut)}
+                  <p className="text-base font-semibold text-gray-700 dark:text-gray-200">{p.typepanne}</p>
+              </div>
+
+              {/* Détails rapides */}
+              <div className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
+                  <p className="flex items-center gap-2 font-medium text-gray-900 dark:text-gray-100">
+                    <User size={16} className="text-blue-500" />
+                    Chauffeur : <span className="font-semibold">{getChauffeurName(p.chauffeur_id)}</span>
+                  </p>
+                  <p className="flex items-center gap-2 font-medium text-gray-900 dark:text-gray-100">
+                    <Calendar size={16} className="text-red-500" />
+                    ID Journée : <span className="font-semibold">{formatDateAsId(p.created_at)}</span>
+                  </p>
+                  <p className="flex items-center gap-2 font-medium text-gray-900 dark:text-gray-100">
+                    <Clock size={16} className="text-orange-500" />
+                    Déclaré à : <span className="font-semibold">{formatTime(p.created_at)}</span>
+                  </p>
+                  <p className="flex items-start gap-2 pt-2 border-t border-dashed dark:border-gray-700/50">
+                    <FileText size={16} className="text-yellow-500 flex-shrink-0 mt-0.5" />
+                    Description : <span className="text-xs italic text-gray-500 dark:text-gray-400">{p.description || "Aucune description fournie"}</span>
+                  </p>
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-2 flex-wrap pt-4 border-t border-gray-200 dark:border-gray-700">
+                {p.latitude && p.longitude && (
+                  <a
+                    href={`https://www.google.com/maps/search/?api=1&query=${p.latitude},${p.longitude}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 text-sm"
+                  >
+                    <MapPin size={14}/> Position GPS
+                  </a>
+                )}
+                {p.photo && (
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    className="dark:text-gray-100 dark:border-gray-600 dark:bg-gray-700 dark:hover:bg-gray-600 hover:text-gray-900 transition-colors" 
+                    onClick={() => { setSelectedPanne(p); setShowPhotoModal(true); }}
+                  >
+                    Voir photo
+                  </Button>
+                )}
+                {p.statut !== "resolu" && (
+                  <Button
+                    size="sm"
+                    className="whitespace-nowrap bg-blue-600 hover:bg-blue-700 text-white dark:bg-blue-700 dark:hover:bg-blue-800 dark:text-gray-100"
+                    onClick={() => handleTraiterPanne(p)}
+                  >
+                    <CheckCircle size={14} className="mr-1" /> Traiter
+                  </Button>
+                )}
+                <Button 
+                  size="sm" 
+                  variant="destructive" 
+                  className="px-3"
+                  onClick={() => { setPanneToDelete(p); setShowModalConfirm(true); }}
                 >
-                  Traiter
+                  <Trash2 size={14} /> 
                 </Button>
-              )}
-            </div>
+              </div>
+            </CardContent>
           </Card>
         ))}
       </div>
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex flex-wrap justify-center gap-2 mt-4">
-          {Array.from({ length: totalPages }, (_, i) => (
-            <Button key={i} size="sm" variant={i + 1 === currentPage ? "default" : "outline"} onClick={() => setCurrentPage(i + 1)}>
-              {i + 1}
-            </Button>
+        <div className="flex justify-center items-center gap-2 mt-6 flex-wrap">
+          {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+            <button
+              key={page}
+              onClick={() => setCurrentPage(page)}
+              className={`px-3 py-1 rounded ${page === currentPage ? "bg-blue-600 text-white" : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600"}`}
+            >
+              {page}
+            </button>
           ))}
         </div>
       )}
 
-      {/* Modal Photo */}
-      {showPhotoModal && selectedPanne && getPhotoUrl(selectedPanne) && (
-        <div className="fixed inset-0 z-50 flex justify-center items-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-white dark:bg-gray-900 rounded-lg p-4 sm:p-6 max-w-3xl w-full relative shadow-2xl flex flex-col gap-4">
-            <button onClick={() => setShowPhotoModal(false)} className="absolute -top-3 -right-3 p-1 rounded-full bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-600 shadow-lg transition">
-              <X size={28}/>
+      {/* Photo Modal */}
+      {showPhotoModal && selectedPanne && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="relative bg-white dark:bg-gray-800 rounded-xl overflow-hidden max-w-3xl w-full">
+            <button
+              onClick={() => setShowPhotoModal(false)}
+              className="absolute top-2 right-2 text-gray-700 dark:text-gray-200 hover:text-red-500"
+            >
+              <X size={20} />
             </button>
-            <h3 className="text-xl font-bold text-gray-800 dark:text-gray-100">Photo de la panne ({selectedPanne.typepanne})</h3>
-            <img src={getPhotoUrl(selectedPanne)} alt="Panne" className="w-full h-auto object-contain rounded-lg max-h-[80vh]" />
+            <img src={getPhotoUrl(selectedPanne)} alt="Photo Panne" className="w-full h-auto object-contain"/>
           </div>
         </div>
       )}
 
-      {/* Confirm Delete */}
-      <ConfirmDialog
-        open={showModalConfirm}
-        onClose={setShowModalConfirm}
-        title="Supprimer cette panne ?"
-        description={`Êtes-vous sûr de vouloir supprimer "${panneToDelete?.typepanne}" ?`}
-        confirmLabel="Supprimer"
-        confirmColor="bg-red-600 hover:bg-red-700"
-        onConfirm={confirmDelete}
-      />
+      {/* Confirm Delete Modal */}
+      {showModalConfirm && (
+        <ConfirmDialog 
+          title="Confirmer la suppression" 
+          message={`Voulez-vous vraiment supprimer la panne "${panneToDelete?.typepanne}" ?`} 
+          onConfirm={confirmDelete} 
+          onCancel={() => { setShowModalConfirm(false); setPanneToDelete(null); }}
+        />
+      )}
     </div>
   );
 }

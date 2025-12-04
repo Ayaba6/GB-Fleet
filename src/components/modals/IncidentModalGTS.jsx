@@ -1,98 +1,213 @@
 // src/components/modals/IncidentModalGTS.jsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { supabase } from "../../config/supabaseClient.js";
+import { Card, CardHeader, CardContent, CardTitle } from "../ui/card.jsx";
 import { Button } from "../ui/button.jsx";
+import { Input } from "../ui/input.jsx";
+import { Textarea } from "../ui/textarea.jsx";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../ui/select.jsx";
+import { Label } from "../ui/label.jsx";
 import { useToast } from "../ui/use-toast.jsx";
-import { X, AlertTriangle } from "lucide-react";
+import {
+  X,
+  Wrench,
+  Camera,
+  MapPin,
+  Loader2,
+  CheckCircle,
+  AlertCircle,
+  Zap,
+  CarFront,
+  Radio,
+} from "lucide-react";
 
-export default function IncidentModalGTS({ missionId, setShowModal, fetchMissions }) {
+const INCIDENT_TYPES = [
+  { value: "mécanique", label: "Mécanique", icon: Wrench },
+  { value: "électrique", label: "Électrique", icon: Zap },
+  { value: "crevaison", label: "Crevaison", icon: AlertCircle },
+  { value: "accident", label: "Accident", icon: CarFront },
+  { value: "autres", label: "Autres", icon: Radio },
+];
+
+export default function IncidentModalGTS({ open, onClose, chauffeurId, missionId }) {
   const { toast } = useToast();
-  const [typeIncident, setTypeIncident] = useState(""); // type ou description courte
-  const [description, setDescription] = useState(""); // détails
+  const [type, setType] = useState("mécanique");
+  const [description, setDescription] = useState("");
+  const [photo, setPhoto] = useState(null);
+  const [latitude, setLatitude] = useState(null);
+  const [longitude, setLongitude] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [gpsStatus, setGpsStatus] = useState("loading");
+
+  // --- GPS ---
+  useEffect(() => {
+    if (open && navigator.geolocation) {
+      setGpsStatus("loading");
+
+      const timeout = setTimeout(() => {
+        setGpsStatus("error");
+      }, 8000);
+
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          clearTimeout(timeout);
+          setLatitude(pos.coords.latitude);
+          setLongitude(pos.coords.longitude);
+          setGpsStatus("success");
+        },
+        () => {
+          clearTimeout(timeout);
+          setGpsStatus("error");
+          toast({
+            title: "Localisation GPS",
+            description: "Impossible d'obtenir la position actuelle. Vérifiez les permissions.",
+            variant: "destructive",
+          });
+        },
+        { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+      );
+
+      return () => clearTimeout(timeout);
+    }
+  }, [open, toast]);
+
+  const handleClose = () => {
+    setType("mécanique");
+    setDescription("");
+    setPhoto(null);
+    setLatitude(null);
+    setLongitude(null);
+    setGpsStatus("loading");
+    onClose();
+  };
+
+  const handlePhotoChange = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      if (file.size > 5 * 1024 * 1024) {
+        toast({ title: "Erreur Photo", description: "Le fichier est trop volumineux (max 5MB).", variant: "destructive" });
+        e.target.value = null;
+        setPhoto(null);
+        return;
+      }
+      setPhoto(file);
+    }
+  };
 
   const handleSubmit = async () => {
-    if (!typeIncident || !description) {
-      toast({ title: "Erreur", description: "Veuillez remplir tous les champs", variant: "destructive" });
+    if (!description.trim()) {
+      toast({ title: "Erreur de validation", description: "La description est obligatoire.", variant: "destructive" });
       return;
     }
 
     setLoading(true);
+    let photoPath = null;
 
-    const { error } = await supabase.from("incidents_gts").insert([
-      {
-        mission_id: missionId,
-        type: typeIncident,
-        description,
-        date: new Date().toISOString(),
-      },
-    ]);
+    if (photo) {
+      const fileExt = photo.name.split(".").pop();
+      const storagePath = `GTS/${chauffeurId}/${Date.now()}.${fileExt}`;
 
-    setLoading(false);
+      const { error: uploadError } = await supabase.storage.from("pannes").upload(storagePath, photo, { cacheControl: "3600", upsert: false });
+      if (uploadError) {
+        toast({ title: "❌ Erreur Upload", description: uploadError.message, variant: "destructive" });
+        setLoading(false);
+        return;
+      }
+      photoPath = storagePath;
+    }
+
+    const { error } = await supabase.from("alertespannes").insert({
+      chauffeur_id: chauffeurId,
+      mission_id: missionId || null,
+      structure: "GTS",
+      typepanne: type,
+      description,
+      photo: photoPath,
+      latitude,
+      longitude,
+      statut: "en_cours",
+      created_at: new Date().toISOString(),
+    });
 
     if (error) {
-      toast({ title: "Erreur", description: error.message, variant: "destructive" });
+      toast({ title: "❌ Erreur de Déclaration", description: error.message, variant: "destructive" });
     } else {
-      toast({ title: "Succès", description: "Incident enregistré !" });
-      fetchMissions();
-      setShowModal(false);
+      toast({ title: "✅ Incident déclaré !", description: "Votre alerte a été envoyée à la maintenance GTS." });
+      handleClose();
+    }
+
+    setLoading(false);
+  };
+
+  if (!open) return null;
+
+  const GpsStatusIndicator = () => {
+    switch (gpsStatus) {
+      case "loading":
+        return <span className="flex items-center text-sm text-blue-500"><Loader2 className="animate-spin w-4 h-4 mr-2" />Localisation en cours...</span>;
+      case "success":
+        return <span className="flex items-center text-sm text-green-600 font-medium"><CheckCircle className="w-4 h-4 mr-2" />GPS: {latitude?.toFixed(6)}, {longitude?.toFixed(6)}</span>;
+      case "error":
+        return <span className="flex items-center text-sm text-red-600"><AlertCircle className="w-4 h-4 mr-2" />Localisation échouée</span>;
+      default:
+        return null;
     }
   };
 
   return (
-    <div
-      className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
-      onClick={() => setShowModal(false)}
-    >
-      <div
-        className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-lg space-y-6"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex justify-between items-center border-b pb-3">
-          <h2 className="text-2xl font-extrabold text-red-600 flex items-center gap-2">
-            <AlertTriangle className="w-6 h-6" /> Déclarer un incident
-          </h2>
-          <Button variant="ghost" onClick={() => setShowModal(false)}>
-            <X className="w-6 h-6" />
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <Card className="w-full max-w-md bg-white relative shadow-2xl rounded-xl">
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="text-2xl font-bold flex items-center gap-3">
+            <Wrench className="w-6 h-6 text-red-600" />
+            Déclarer un incident (GTS)
+          </CardTitle>
+          <Button onClick={handleClose} variant="ghost" size="icon" className="rounded-full">
+            <X size={20} />
           </Button>
-        </div>
+        </CardHeader>
 
-        <div className="space-y-4">
-          <div>
-            <label className="block mb-1 font-medium text-gray-700">Type d'incident</label>
-            <input
-              type="text"
-              className="w-full border rounded-lg p-2"
-              value={typeIncident}
-              onChange={(e) => setTypeIncident(e.target.value)}
-              placeholder="Ex : Panne moteur, Accident..."
-            />
+        <CardContent className="space-y-5 pt-2">
+          <div className="space-y-2">
+            <Label>Type d'incident</Label>
+            <Select value={type} onValueChange={setType}>
+              <SelectTrigger><SelectValue placeholder="Sélectionnez..." /></SelectTrigger>
+              <SelectContent>
+                {INCIDENT_TYPES.map((i) => (
+                  <SelectItem key={i.value} value={i.value}>
+                    <i.icon className="w-4 h-4 mr-2 inline" />{i.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-          <div>
-            <label className="block mb-1 font-medium text-gray-700">Description</label>
-            <textarea
-              rows={4}
-              className="w-full border rounded-lg p-2"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Décrivez les détails de l'incident..."
-            />
-          </div>
-        </div>
 
-        <div className="flex justify-end gap-2 pt-4 border-t">
-          <Button variant="outline" onClick={() => setShowModal(false)}>
-            Annuler
+          <div className="space-y-2">
+            <Label>Description *</Label>
+            <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Décrivez l'incident..." />
+          </div>
+
+          <div className="space-y-2">
+            <Label><Camera className="inline w-4 h-4 mr-2" />Photo (optionnel)</Label>
+            <Input type="file" accept="image/*" onChange={handlePhotoChange} />
+          </div>
+
+          <div className="flex items-center justify-between border-t pt-3">
+            <Label><MapPin className="inline w-4 h-4 mr-2" />Position GPS</Label>
+            <GpsStatusIndicator />
+          </div>
+
+          <Button onClick={handleSubmit} disabled={loading || !description.trim()} className="w-full bg-red-600 hover:bg-red-700 text-white">
+            {loading ? <span className="flex items-center"><Loader2 className="animate-spin w-4 h-4 mr-2" />Envoi...</span> : "Déclarer l'incident"}
           </Button>
-          <Button
-            className="bg-red-600 hover:bg-red-700 text-white"
-            onClick={handleSubmit}
-            disabled={loading}
-          >
-            {loading ? "Enregistrement..." : "Enregistrer"}
-          </Button>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
