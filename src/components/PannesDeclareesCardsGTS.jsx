@@ -9,14 +9,16 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { 
   Bell, MapPin, FileText, File, X, Wrench, CheckCircle, AlertTriangle, Loader2,
-  User, Clock, Calendar, Trash2
+  User, Clock, Calendar, Trash2, Truck
 } from "lucide-react";
 
 export default function PannesDeclareesCardsGts() {
   const STRUCTURE = "GTS";
   const { toast } = useToast();
   const [pannes, setPannes] = useState([]);
+  const [missions, setMissions] = useState([]);
   const [chauffeurs, setChauffeurs] = useState([]);
+  const [camions, setCamions] = useState([]);
   const [filter, setFilter] = useState("toutes");
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -28,39 +30,49 @@ export default function PannesDeclareesCardsGts() {
   const ITEMS_PER_PAGE = 9;
 
   // --- Formatage date / heure ---
-  const formatDateAsId = (dateString) => {
-    if (!dateString) return "N/A";
-    const date = new Date(dateString);
-    return date.toLocaleDateString("fr-FR");
-  };
-
-  const formatTime = (dateString) => {
-    if (!dateString) return "N/A";
-    const date = new Date(dateString);
-    return date.toLocaleTimeString("fr-FR", { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-  };
+  const formatDateAsId = (dateString) => dateString ? new Date(dateString).toLocaleDateString("fr-FR") : "N/A";
+  const formatTime = (dateString) => dateString ? new Date(dateString).toLocaleTimeString("fr-FR", { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : "N/A";
 
   // --- Récupération des données + Realtime ---
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
-      const { data: chauffeursData, error: chauffeursError } = await supabase
-        .from("users")
-        .select("id, name")
-        .eq("role", "chauffeur")
-        .eq("structure", STRUCTURE);
 
+      // Récupérer pannes
       const { data: pannesData, error: pannesError } = await supabase
         .from("alertespannes")
         .select("*")
         .eq("structure", STRUCTURE)
         .order("created_at", { ascending: false });
 
-      if (chauffeursError) console.error("Erreur chargement chauffeurs:", chauffeursError);
       if (pannesError) console.error("Erreur chargement pannes:", pannesError);
 
-      setChauffeurs(chauffeursData || []);
+      // Récupérer missions
+      const { data: missionsData, error: missionsError } = await supabase
+        .from("missions_gts")
+        .select("id, chauffeur_id, camion_id")
+        .eq("structure", STRUCTURE);
+      if (missionsError) console.error("Erreur chargement missions:", missionsError);
+
+      // Récupérer chauffeurs
+      const { data: chauffeursData, error: chauffeursError } = await supabase
+        .from("users")
+        .select("id, name")
+        .eq("role", "chauffeur")
+        .eq("structure", STRUCTURE);
+      if (chauffeursError) console.error("Erreur chargement chauffeurs:", chauffeursError);
+
+      // Récupérer camions
+      const { data: camionsData, error: camionsError } = await supabase
+        .from("camions")
+        .select("id, immatriculation")
+        .eq("structure", STRUCTURE);
+      if (camionsError) console.error("Erreur chargement camions:", camionsError);
+
       setPannes(pannesData || []);
+      setMissions(missionsData || []);
+      setChauffeurs(chauffeursData || []);
+      setCamions(camionsData || []);
       setIsLoading(false);
     };
 
@@ -87,7 +99,24 @@ export default function PannesDeclareesCardsGts() {
     return () => supabase.removeChannel(channel);
   }, [toast]);
 
-  const getChauffeurName = useCallback((id) => chauffeurs.find(c => c.id === id)?.name || "Inconnu", [chauffeurs]);
+  // --- Relations mission → chauffeur / camion ---
+  const getMissionById = useCallback((id) => missions.find(m => m.id === id), [missions]);
+  const getChauffeurNameFromMission = useCallback(
+    (missionId) => {
+      const mission = getMissionById(missionId);
+      if (!mission) return "Inconnu";
+      return chauffeurs.find(c => c.id === mission.chauffeur_id)?.name || "Inconnu";
+    },
+    [missions, chauffeurs]
+  );
+  const getCamionFromMission = useCallback(
+    (missionId) => {
+      const mission = getMissionById(missionId);
+      if (!mission) return "Inconnu";
+      return camions.find(c => c.id === mission.camion_id)?.immatriculation || "Inconnu";
+    },
+    [missions, camions]
+  );
 
   const getPhotoUrl = (panne) => {
     if (!panne.photo) return null;
@@ -98,17 +127,9 @@ export default function PannesDeclareesCardsGts() {
   // --- Actions ---
   const handleTraiterPanne = async (panne) => {
     if (panne.statut === "resolu") return;
-
-    const { error } = await supabase
-      .from("alertespannes")
-      .update({ statut: "resolu" })
-      .eq("id", panne.id);
-
-    if (error) {
-      toast({ title: "Erreur", description: error.message, variant: "destructive" });
-    } else {
-      toast({ title: "Panne traitée", description: `"${panne.typepanne}" a été résolue.`, duration: 3000 });
-    }
+    const { error } = await supabase.from("alertespannes").update({ statut: "resolu" }).eq("id", panne.id);
+    if (error) toast({ title: "Erreur", description: error.message, variant: "destructive" });
+    else toast({ title: "Panne traitée", description: `"${panne.typepanne}" a été résolue.`, duration: 3000 });
   };
 
   const confirmDelete = async () => {
@@ -117,10 +138,8 @@ export default function PannesDeclareesCardsGts() {
         const { error: storageError } = await supabase.storage.from("pannes").remove([panneToDelete.photo]);
         if (storageError) console.error("Erreur suppression photo:", storageError);
       }
-
       const { error: dbError } = await supabase.from("alertespannes").delete().eq("id", panneToDelete.id);
       if (dbError) throw dbError;
-
       toast({ title: "Panne supprimée", description: `"${panneToDelete.typepanne}" a été supprimée.`, duration: 3000 });
       setShowModalConfirm(false);
       setPanneToDelete(null);
@@ -137,7 +156,8 @@ export default function PannesDeclareesCardsGts() {
       (p.mission_id?.toString() || "").toLowerCase().includes(searchString) ||
       (p.description || "").toLowerCase().includes(searchString) ||
       (p.typepanne || "").toLowerCase().includes(searchString) ||
-      getChauffeurName(p.chauffeur_id).toLowerCase().includes(searchString) ||
+      getChauffeurNameFromMission(p.mission_id).toLowerCase().includes(searchString) ||
+      getCamionFromMission(p.mission_id).toLowerCase().includes(searchString) ||
       (p.created_at ? formatDateAsId(p.created_at).includes(searchString) : false) ||
       (p.created_at ? formatTime(p.created_at).includes(searchString) : false);
     return matchFilter && matchSearch;
@@ -150,7 +170,8 @@ export default function PannesDeclareesCardsGts() {
   const exportExcel = () => {
     const wsData = filteredPannes.map(p => ({
       Mission: p.mission_id || "N/A",
-      Chauffeur: getChauffeurName(p.chauffeur_id),
+      Chauffeur: getChauffeurNameFromMission(p.mission_id),
+      Camion: getCamionFromMission(p.mission_id),
       Type: p.typepanne || "N/A",
       Description: p.description || "",
       Statut: p.statut,
@@ -172,10 +193,11 @@ export default function PannesDeclareesCardsGts() {
     doc.text("Liste des Pannes Déclarées - GTS", 14, 20);
     autoTable(doc, {
       startY: 30,
-      head: [["Mission", "Chauffeur", "Type", "Description", "Statut", "Date", "Latitude", "Longitude", "Photo"]],
+      head: [["Mission", "Chauffeur", "Camion", "Type", "Description", "Statut", "Date", "Latitude", "Longitude", "Photo"]],
       body: filteredPannes.map(p => [
         p.mission_id || "N/A",
-        getChauffeurName(p.chauffeur_id),
+        getChauffeurNameFromMission(p.mission_id),
+        getCamionFromMission(p.mission_id),
         p.typepanne || "N/A",
         p.description || "",
         p.statut,
@@ -192,7 +214,6 @@ export default function PannesDeclareesCardsGts() {
     toast({ title: "Export PDF", description: "Document généré." });
   };
 
-  // --- Badge Statut ---
   const getStatusBadge = (statut) => {
     const colors = {
       en_cours: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
@@ -210,10 +231,8 @@ export default function PannesDeclareesCardsGts() {
     );
   };
 
-  // --- RENDER ---
   return (
     <div className="p-4 sm:p-6 space-y-6 container max-w-[1440px] mx-auto">
-      
       {/* Header */}
       <Card className="shadow-xl bg-white/90 dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
         <CardHeader className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 sm:p-6 gap-2 sm:gap-0">
@@ -231,13 +250,11 @@ export default function PannesDeclareesCardsGts() {
         </CardHeader>
       </Card>
 
-      <hr className="my-4"/>
-
       {/* Filtre + Recherche */}
       <div className="flex flex-wrap gap-3 items-center justify-between bg-white dark:bg-gray-800 p-4 rounded-xl shadow border border-gray-100 dark:border-gray-700">
         <input
           type="text"
-          placeholder="🔍 Rechercher (Journée, Chauffeur, Type, Heure...)"
+          placeholder="🔍 Rechercher (Journée, Chauffeur, Camion, Type, Heure...)"
           value={search}
           onChange={e => { setSearch(e.target.value); setCurrentPage(1); }}
           className="flex-1 min-w-[200px] border border-gray-300 dark:border-gray-600 rounded px-3 py-2 dark:bg-gray-700 dark:text-gray-200 placeholder:text-gray-500 dark:placeholder:text-gray-400 focus:ring-blue-500 focus:border-blue-500 outline-none"
@@ -257,8 +274,6 @@ export default function PannesDeclareesCardsGts() {
         )}
       </div>
 
-      <hr className="my-4"/>
-
       {/* Liste des pannes */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {isLoading ? (
@@ -271,18 +286,18 @@ export default function PannesDeclareesCardsGts() {
         ) : paginatedPannes.map(p => (
           <Card key={p.id} className="shadow-lg p-5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 flex flex-col justify-between hover:shadow-xl transition duration-300">
             <CardContent className="p-0 space-y-3">
-              
-              {/* Statut et Type */}
               <div className="flex justify-between items-center pb-2 border-b border-gray-100 dark:border-gray-700/50">
                   {getStatusBadge(p.statut)}
                   <p className="text-base font-semibold text-gray-700 dark:text-gray-200">{p.typepanne}</p>
               </div>
-
-              {/* Détails rapides */}
               <div className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
                   <p className="flex items-center gap-2 font-medium text-gray-900 dark:text-gray-100">
                     <User size={16} className="text-blue-500" />
-                    Chauffeur : <span className="font-semibold">{getChauffeurName(p.chauffeur_id)}</span>
+                    Chauffeur : <span className="font-semibold">{getChauffeurNameFromMission(p.mission_id)}</span>
+                  </p>
+                  <p className="flex items-center gap-2 font-medium text-gray-900 dark:text-gray-100">
+                    <Truck size={16} className="text-green-500" />
+                    Camion : <span className="font-semibold">{getCamionFromMission(p.mission_id)}</span>
                   </p>
                   <p className="flex items-center gap-2 font-medium text-gray-900 dark:text-gray-100">
                     <Calendar size={16} className="text-red-500" />
@@ -297,8 +312,6 @@ export default function PannesDeclareesCardsGts() {
                     Description : <span className="text-xs italic text-gray-500 dark:text-gray-400">{p.description || "Aucune description fournie"}</span>
                   </p>
               </div>
-
-              {/* Actions */}
               <div className="flex gap-2 flex-wrap pt-4 border-t border-gray-200 dark:border-gray-700">
                 {p.latitude && p.longitude && (
                   <a
