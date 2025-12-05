@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState } from "react";
 import { supabase } from "../config/supabaseClient.js";
 import { Card, CardHeader, CardContent } from "./ui/card.jsx";
 import { Button } from "./ui/button.jsx";
@@ -38,85 +38,117 @@ export default function PannesDeclareesCardsGts() {
     const fetchData = async () => {
       setIsLoading(true);
 
-      // Récupérer pannes
-      const { data: pannesData, error: pannesError } = await supabase
-        .from("alertespannes")
-        .select("*")
-        .eq("structure", STRUCTURE)
-        .order("created_at", { ascending: false });
+      try {
+        // --- Pannes ---
+        const { data: pannesData, error: pannesError } = await supabase
+          .from("alertespannes")
+          .select("*")
+          .eq("structure", STRUCTURE)
+          .order("created_at", { ascending: false });
+        if (pannesError) throw pannesError;
 
-      if (pannesError) console.error("Erreur chargement pannes:", pannesError);
+        // --- Missions GTS ---
+        const { data: missionsData, error: missionsError } = await supabase
+          .from("missions_gts")
+          .select("id, chauffeur_id, camion_id")
+          .eq("structure", STRUCTURE);
+        if (missionsError) throw missionsError;
 
-      // Récupérer missions
-      const { data: missionsData, error: missionsError } = await supabase
-        .from("missions_gts")
-        .select("id, chauffeur_id, camion_id")
-        .eq("structure", STRUCTURE);
-      if (missionsError) console.error("Erreur chargement missions:", missionsError);
+        // --- Chauffeurs (table "profiles") ---
+        const { data: chauffeursData, error: chauffeursError } = await supabase
+          .from("profiles")
+          .select("id, name")
+          .eq("role", "chauffeur")
+          .eq("structure", STRUCTURE);
+        if (chauffeursError) throw chauffeursError;
 
-      // Récupérer chauffeurs
-      const { data: chauffeursData, error: chauffeursError } = await supabase
-        .from("users")
-        .select("id, name")
-        .eq("role", "chauffeur")
-        .eq("structure", STRUCTURE);
-      if (chauffeursError) console.error("Erreur chargement chauffeurs:", chauffeursError);
+        // --- Camions ---
+        const { data: camionsData, error: camionsError } = await supabase
+          .from("camions")
+          .select("id, immatriculation")
+          .eq("structure", STRUCTURE);
+        if (camionsError) throw camionsError;
 
-      // Récupérer camions
-      const { data: camionsData, error: camionsError } = await supabase
-        .from("camions")
-        .select("id, immatriculation")
-        .eq("structure", STRUCTURE);
-      if (camionsError) console.error("Erreur chargement camions:", camionsError);
-
-      setPannes(pannesData || []);
-      setMissions(missionsData || []);
-      setChauffeurs(chauffeursData || []);
-      setCamions(camionsData || []);
-      setIsLoading(false);
+        // --- Mise à jour des états ---
+        setPannes(pannesData || []);
+        setMissions(missionsData || []);
+        setChauffeurs(chauffeursData || []);
+        setCamions(camionsData || []);
+      } catch (err) {
+        console.error("Erreur chargement données GTS:", err);
+        toast({ title: "Erreur chargement", description: err.message, variant: "destructive" });
+      } finally {
+        setIsLoading(false);
+      }
     };
 
     fetchData();
 
+    // --- Realtime ---
     const channel = supabase
       .channel(`pannes-${STRUCTURE}`)
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "alertespannes" }, (payload) => {
-        if (payload.new.structure === STRUCTURE) {
-          setPannes(prev => [payload.new, ...prev]);
-          toast({ title: "Nouvelle Alerte", description: `Panne : ${payload.new.typepanne}`, duration: 5000 });
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "alertespannes" },
+        (payload) => {
+          if (payload.new.structure === STRUCTURE) {
+            setPannes(prev => [payload.new, ...prev]);
+            toast({ title: "Nouvelle Alerte", description: `Panne : ${payload.new.typepanne}`, duration: 5000 });
+          }
         }
-      })
-      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "alertespannes" }, (payload) => {
-        if (payload.new.structure === STRUCTURE) {
-          setPannes(prev => prev.map(p => (p.id === payload.new.id ? payload.new : p)));
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "alertespannes" },
+        (payload) => {
+          if (payload.new.structure === STRUCTURE) {
+            setPannes(prev => prev.map(p => (p.id === payload.new.id ? payload.new : p)));
+          }
         }
-      })
-      .on("postgres_changes", { event: "DELETE", schema: "public", table: "alertespannes" }, (payload) => {
-        setPannes(prev => prev.filter(p => p.id !== payload.old.id));
-      })
+      )
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "alertespannes" },
+        (payload) => {
+          setPannes(prev => prev.filter(p => p.id !== payload.old.id));
+        }
+      )
       .subscribe();
 
     return () => supabase.removeChannel(channel);
   }, [toast]);
 
-  // --- Relations mission → chauffeur / camion ---
-  const getMissionById = useCallback((id) => missions.find(m => m.id === id), [missions]);
-  const getChauffeurNameFromMission = useCallback(
-    (missionId) => {
-      const mission = getMissionById(missionId);
-      if (!mission) return "Inconnu";
-      return chauffeurs.find(c => c.id === mission.chauffeur_id)?.name || "Inconnu";
-    },
-    [missions, chauffeurs]
-  );
-  const getCamionFromMission = useCallback(
-    (missionId) => {
-      const mission = getMissionById(missionId);
-      if (!mission) return "Inconnu";
-      return camions.find(c => c.id === mission.camion_id)?.immatriculation || "Inconnu";
-    },
-    [missions, camions]
-  );
+  // --- Fonctions utilitaires ---
+  const getChauffeurDisplay = (p) => {
+    if (p.mission_id) {
+      const mission = missions.find(m => m.id.toString() === p.mission_id.toString());
+      if (mission && mission.chauffeur_id) {
+        const chauffeur = chauffeurs.find(c => c.id.toString() === mission.chauffeur_id.toString());
+        if (chauffeur) return chauffeur.name;
+      }
+    }
+    if (p.chauffeur_id) {
+      const chauffeur = chauffeurs.find(c => c.id.toString() === p.chauffeur_id.toString());
+      if (chauffeur) return chauffeur.name;
+    }
+    console.log("Chauffeur inconnu pour panne:", p);
+    return "Inconnu";
+  };
+
+  const getCamionDisplay = (p) => {
+    if (p.mission_id) {
+      const mission = missions.find(m => m.id.toString() === p.mission_id.toString());
+      if (mission && mission.camion_id) {
+        const camion = camions.find(c => c.id.toString() === mission.camion_id.toString());
+        if (camion) return camion.immatriculation;
+      }
+    }
+    if (p.camion_id) {
+      const camion = camions.find(c => c.id.toString() === p.camion_id.toString());
+      if (camion) return camion.immatriculation;
+    }
+    return "Inconnu";
+  };
 
   const getPhotoUrl = (panne) => {
     if (!panne.photo) return null;
@@ -124,7 +156,6 @@ export default function PannesDeclareesCardsGts() {
     return data.publicUrl;
   };
 
-  // --- Actions ---
   const handleTraiterPanne = async (panne) => {
     if (panne.statut === "resolu") return;
     const { error } = await supabase.from("alertespannes").update({ statut: "resolu" }).eq("id", panne.id);
@@ -153,11 +184,10 @@ export default function PannesDeclareesCardsGts() {
     const matchFilter = filter === "toutes" ? true : p.statut === filter;
     const searchString = search.toLowerCase();
     const matchSearch =
-      (p.mission_id?.toString() || "").toLowerCase().includes(searchString) ||
-      (p.description || "").toLowerCase().includes(searchString) ||
       (p.typepanne || "").toLowerCase().includes(searchString) ||
-      getChauffeurNameFromMission(p.mission_id).toLowerCase().includes(searchString) ||
-      getCamionFromMission(p.mission_id).toLowerCase().includes(searchString) ||
+      (p.description || "").toLowerCase().includes(searchString) ||
+      getChauffeurDisplay(p).toLowerCase().includes(searchString) ||
+      getCamionDisplay(p).toLowerCase().includes(searchString) ||
       (p.created_at ? formatDateAsId(p.created_at).includes(searchString) : false) ||
       (p.created_at ? formatTime(p.created_at).includes(searchString) : false);
     return matchFilter && matchSearch;
@@ -170,8 +200,8 @@ export default function PannesDeclareesCardsGts() {
   const exportExcel = () => {
     const wsData = filteredPannes.map(p => ({
       Mission: p.mission_id || "N/A",
-      Chauffeur: getChauffeurNameFromMission(p.mission_id),
-      Camion: getCamionFromMission(p.mission_id),
+      Chauffeur: getChauffeurDisplay(p),
+      Camion: getCamionDisplay(p),
       Type: p.typepanne || "N/A",
       Description: p.description || "",
       Statut: p.statut,
@@ -196,8 +226,8 @@ export default function PannesDeclareesCardsGts() {
       head: [["Mission", "Chauffeur", "Camion", "Type", "Description", "Statut", "Date", "Latitude", "Longitude", "Photo"]],
       body: filteredPannes.map(p => [
         p.mission_id || "N/A",
-        getChauffeurNameFromMission(p.mission_id),
-        getCamionFromMission(p.mission_id),
+        getChauffeurDisplay(p),
+        getCamionDisplay(p),
         p.typepanne || "N/A",
         p.description || "",
         p.statut,
@@ -231,6 +261,7 @@ export default function PannesDeclareesCardsGts() {
     );
   };
 
+  // --- Render ---
   return (
     <div className="p-4 sm:p-6 space-y-6 container max-w-[1440px] mx-auto">
       {/* Header */}
@@ -248,31 +279,31 @@ export default function PannesDeclareesCardsGts() {
             </Button>
           </div>
         </CardHeader>
-      </Card>
 
-      {/* Filtre + Recherche */}
-      <div className="flex flex-wrap gap-3 items-center justify-between bg-white dark:bg-gray-800 p-4 rounded-xl shadow border border-gray-100 dark:border-gray-700">
-        <input
-          type="text"
-          placeholder="🔍 Rechercher (Journée, Chauffeur, Camion, Type, Heure...)"
-          value={search}
-          onChange={e => { setSearch(e.target.value); setCurrentPage(1); }}
-          className="flex-1 min-w-[200px] border border-gray-300 dark:border-gray-600 rounded px-3 py-2 dark:bg-gray-700 dark:text-gray-200 placeholder:text-gray-500 dark:placeholder:text-gray-400 focus:ring-blue-500 focus:border-blue-500 outline-none"
-        />
-        <select
-          value={filter}
-          onChange={e => { setFilter(e.target.value); setCurrentPage(1); }}
-          className="border rounded px-3 py-2 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600 outline-none"
-        >
-          <option value="toutes">Toutes</option>
-          <option value="en_cours">En cours</option>
-          <option value="resolu">Résolu</option>
-          <option value="signale">Signalé</option>
-        </select>
-        {pannes.length > 0 && (
-          <span className="text-sm text-gray-500 dark:text-gray-400">Affiché: **{filteredPannes.length}** pannes</span>
-        )}
-      </div>
+        {/* Filtre + Recherche */}
+        <div className="flex flex-wrap gap-3 items-center justify-between bg-white dark:bg-gray-800 p-4 rounded-xl shadow border border-gray-100 dark:border-gray-700">
+          <input
+            type="text"
+            placeholder="🔍 Rechercher (Journée, Chauffeur, Camion, Type, Heure...)"
+            value={search}
+            onChange={e => { setSearch(e.target.value); setCurrentPage(1); }}
+            className="flex-1 min-w-[200px] border border-gray-300 dark:border-gray-600 rounded px-3 py-2 dark:bg-gray-700 dark:text-gray-200 placeholder:text-gray-500 dark:placeholder:text-gray-400 focus:ring-blue-500 focus:border-blue-500 outline-none"
+          />
+          <select
+            value={filter}
+            onChange={e => { setFilter(e.target.value); setCurrentPage(1); }}
+            className="border rounded px-3 py-2 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600 outline-none"
+          >
+            <option value="toutes">Toutes</option>
+            <option value="en_cours">En cours</option>
+            <option value="resolu">Résolu</option>
+            <option value="signale">Signalé</option>
+          </select>
+          {pannes.length > 0 && (
+            <span className="text-sm text-gray-500 dark:text-gray-400">Affiché: **{filteredPannes.length}** pannes</span>
+          )}
+        </div>
+      </Card>
 
       {/* Liste des pannes */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -287,30 +318,30 @@ export default function PannesDeclareesCardsGts() {
           <Card key={p.id} className="shadow-lg p-5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 flex flex-col justify-between hover:shadow-xl transition duration-300">
             <CardContent className="p-0 space-y-3">
               <div className="flex justify-between items-center pb-2 border-b border-gray-100 dark:border-gray-700/50">
-                  {getStatusBadge(p.statut)}
-                  <p className="text-base font-semibold text-gray-700 dark:text-gray-200">{p.typepanne}</p>
+                {getStatusBadge(p.statut)}
+                <p className="text-base font-semibold text-gray-700 dark:text-gray-200">{p.typepanne}</p>
               </div>
               <div className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
-                  <p className="flex items-center gap-2 font-medium text-gray-900 dark:text-gray-100">
-                    <User size={16} className="text-blue-500" />
-                    Chauffeur : <span className="font-semibold">{getChauffeurNameFromMission(p.mission_id)}</span>
-                  </p>
-                  <p className="flex items-center gap-2 font-medium text-gray-900 dark:text-gray-100">
-                    <Truck size={16} className="text-green-500" />
-                    Camion : <span className="font-semibold">{getCamionFromMission(p.mission_id)}</span>
-                  </p>
-                  <p className="flex items-center gap-2 font-medium text-gray-900 dark:text-gray-100">
-                    <Calendar size={16} className="text-red-500" />
-                    ID Journée : <span className="font-semibold">{formatDateAsId(p.created_at)}</span>
-                  </p>
-                  <p className="flex items-center gap-2 font-medium text-gray-900 dark:text-gray-100">
-                    <Clock size={16} className="text-orange-500" />
-                    Déclaré à : <span className="font-semibold">{formatTime(p.created_at)}</span>
-                  </p>
-                  <p className="flex items-start gap-2 pt-2 border-t border-dashed dark:border-gray-700/50">
-                    <FileText size={16} className="text-yellow-500 flex-shrink-0 mt-0.5" />
-                    Description : <span className="text-xs italic text-gray-500 dark:text-gray-400">{p.description || "Aucune description fournie"}</span>
-                  </p>
+                <p className="flex items-center gap-2 font-medium text-gray-900 dark:text-gray-100">
+                  <User size={16} className="text-blue-500" />
+                  Chauffeur : <span className="font-semibold">{getChauffeurDisplay(p)}</span>
+                </p>
+                <p className="flex items-center gap-2 font-medium text-gray-900 dark:text-gray-100">
+                  <Truck size={16} className="text-green-500" />
+                  Camion : <span className="font-semibold">{getCamionDisplay(p)}</span>
+                </p>
+                <p className="flex items-center gap-2 font-medium text-gray-900 dark:text-gray-100">
+                  <Calendar size={16} className="text-red-500" />
+                  ID Journée : <span className="font-semibold">{formatDateAsId(p.created_at)}</span>
+                </p>
+                <p className="flex items-center gap-2 font-medium text-gray-900 dark:text-gray-100">
+                  <Clock size={16} className="text-orange-500" />
+                  Déclaré à : <span className="font-semibold">{formatTime(p.created_at)}</span>
+                </p>
+                <p className="flex items-start gap-2 pt-2 border-t border-dashed dark:border-gray-700/50">
+                  <FileText size={16} className="text-yellow-500 flex-shrink-0 mt-0.5" />
+                  Description : <span className="text-xs italic text-gray-500 dark:text-gray-400">{p.description || "Aucune description fournie"}</span>
+                </p>
               </div>
               <div className="flex gap-2 flex-wrap pt-4 border-t border-gray-200 dark:border-gray-700">
                 {p.latitude && p.longitude && (
@@ -318,38 +349,33 @@ export default function PannesDeclareesCardsGts() {
                     href={`https://www.google.com/maps/search/?api=1&query=${p.latitude},${p.longitude}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 text-sm"
+                    className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 rounded text-xs flex items-center gap-1"
                   >
-                    <MapPin size={14}/> Position GPS
+                    <MapPin size={14} /> Localisation
                   </a>
                 )}
                 {p.photo && (
-                  <Button 
-                    size="sm" 
-                    variant="outline" 
-                    className="dark:text-gray-100 dark:border-gray-600 dark:bg-gray-700 dark:hover:bg-gray-600 hover:text-gray-900 transition-colors" 
+                  <button
                     onClick={() => { setSelectedPanne(p); setShowPhotoModal(true); }}
+                    className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 rounded text-xs flex items-center gap-1"
                   >
-                    Voir photo
-                  </Button>
+                    <File size={14} /> Photo
+                  </button>
                 )}
                 {p.statut !== "resolu" && (
-                  <Button
-                    size="sm"
-                    className="whitespace-nowrap bg-blue-600 hover:bg-blue-700 text-white dark:bg-blue-700 dark:hover:bg-blue-800 dark:text-gray-100"
+                  <button
                     onClick={() => handleTraiterPanne(p)}
+                    className="px-2 py-1 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 rounded text-xs flex items-center gap-1"
                   >
-                    <CheckCircle size={14} className="mr-1" /> Traiter
-                  </Button>
+                    <CheckCircle size={14} /> Traiter
+                  </button>
                 )}
-                <Button 
-                  size="sm" 
-                  variant="destructive" 
-                  className="px-3"
+                <button
                   onClick={() => { setPanneToDelete(p); setShowModalConfirm(true); }}
+                  className="px-2 py-1 bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200 rounded text-xs flex items-center gap-1"
                 >
-                  <Trash2 size={14} /> 
-                </Button>
+                  <Trash2 size={14} /> Supprimer
+                </button>
               </div>
             </CardContent>
           </Card>
@@ -358,41 +384,29 @@ export default function PannesDeclareesCardsGts() {
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex justify-center items-center gap-2 mt-6 flex-wrap">
-          {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
-            <button
-              key={page}
-              onClick={() => setCurrentPage(page)}
-              className={`px-3 py-1 rounded ${page === currentPage ? "bg-blue-600 text-white" : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600"}`}
-            >
-              {page}
-            </button>
-          ))}
+        <div className="flex justify-center items-center gap-2 mt-6">
+          <Button onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} disabled={currentPage === 1}>Précédent</Button>
+          <span className="px-2 py-1 text-gray-700 dark:text-gray-200">{currentPage} / {totalPages}</span>
+          <Button onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} disabled={currentPage === totalPages}>Suivant</Button>
         </div>
       )}
 
-      {/* Photo Modal */}
+      {/* Modales */}
       {showPhotoModal && selectedPanne && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="relative bg-white dark:bg-gray-800 rounded-xl overflow-hidden max-w-3xl w-full">
-            <button
-              onClick={() => setShowPhotoModal(false)}
-              className="absolute top-2 right-2 text-gray-700 dark:text-gray-200 hover:text-red-500"
-            >
-              <X size={20} />
-            </button>
-            <img src={getPhotoUrl(selectedPanne)} alt="Photo Panne" className="w-full h-auto object-contain"/>
+          <div className="bg-white dark:bg-gray-800 p-4 rounded-lg max-w-lg w-full relative">
+            <button onClick={() => setShowPhotoModal(false)} className="absolute top-2 right-2 text-gray-700 dark:text-gray-200"><X size={20} /></button>
+            <img src={getPhotoUrl(selectedPanne)} alt="Panne" className="max-w-full max-h-[80vh] object-contain rounded" />
           </div>
         </div>
       )}
 
-      {/* Confirm Delete Modal */}
-      {showModalConfirm && (
-        <ConfirmDialog 
-          title="Confirmer la suppression" 
-          message={`Voulez-vous vraiment supprimer la panne "${panneToDelete?.typepanne}" ?`} 
-          onConfirm={confirmDelete} 
-          onCancel={() => { setShowModalConfirm(false); setPanneToDelete(null); }}
+      {showModalConfirm && panneToDelete && (
+        <ConfirmDialog
+          title="Confirmation suppression"
+          description={`Voulez-vous vraiment supprimer la panne "${panneToDelete.typepanne}" ? Cette action est irréversible.`}
+          onConfirm={confirmDelete}
+          onCancel={() => setShowModalConfirm(false)}
         />
       )}
     </div>

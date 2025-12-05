@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { supabase } from "../config/supabaseClient.js";
+import { supabase } from "../config/supabaseClient.js"; 
 import AdminDashboard from "../pages/AdminDashboard.jsx";
 import ChauffeurDashboardGTS from "../pages/ChauffeurDashboardGTS.jsx";
 import ChauffeurDashboardBaticom from "../pages/ChauffeurDashboardBaticom.jsx";
@@ -12,7 +12,6 @@ export default function RoleBasedRouting({ session }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Dictionnaire des dashboards possibles
   const dashboards = {
     admin: AdminDashboard,
     chauffeur_gts: ChauffeurDashboardGTS,
@@ -21,7 +20,6 @@ export default function RoleBasedRouting({ session }) {
     superviseur_baticom: SuperviseurDashboardBaticom,
   };
 
-  // Récupération du rôle utilisateur
   const fetchUserRole = useCallback(async (userId) => {
     setLoading(true);
     setError(null);
@@ -40,46 +38,46 @@ export default function RoleBasedRouting({ session }) {
         const structure = profile.structure?.toLowerCase();
 
         if (role === "admin") {
-          // ✅ Cas spécial : admin sans structure
           setRoleKey("admin");
-        } else if (structure) {
+        } 
+        else if (structure) {
           const key = `${role}_${structure}`;
           if (dashboards[key]) {
             setRoleKey(key);
           } else {
-            setError(`Rôle inconnu ou dashboard non défini pour ${key}`);
+            setError(`Aucun dashboard défini pour : ${key}`);
           }
-        } else {
+        } 
+        else {
           setError("Structure non définie pour cet utilisateur.");
         }
       } else {
-        setError("Rôle non défini. Contactez l'administrateur.");
+        setError("Rôle non défini pour cet utilisateur.");
       }
+
     } catch (err) {
       console.error("Erreur de récupération de rôle:", err.message);
-      setError("Erreur de connexion au profil. Veuillez réessayer.");
-      await supabase.auth.signOut();
+      setError("Impossible de charger votre rôle. Vérifiez votre connexion ou contactez l'admin.");
     } finally {
       setLoading(false);
     }
   }, []);
 
-  // Effet pour charger le profil dès qu'une session existe
   useEffect(() => {
-    if (session?.user?.id) fetchUserRole(session.user.id);
-  }, [session, fetchUserRole]);
+    if (!session?.user?.id || roleKey) return;
+    fetchUserRole(session.user.id);
+  }, [session, fetchUserRole, roleKey]);
 
-  // Affichage du chargement
-  if (loading)
+  if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-100">
         <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-b-4 border-blue-500"></div>
         <p className="text-gray-500 ml-4">Chargement de votre session...</p>
       </div>
     );
+  }
 
-  // Affichage d'une erreur (ex : rôle non trouvé)
-  if (error)
+  if (error) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-red-50 p-6">
         <h1 className="text-2xl font-bold text-red-700 mb-4">Accès Refusé</h1>
@@ -92,9 +90,10 @@ export default function RoleBasedRouting({ session }) {
         </button>
       </div>
     );
+  }
 
-  // Sélection dynamique du dashboard
   const DashboardComponent = dashboards[roleKey];
+
   return DashboardComponent ? (
     <DashboardComponent session={session} />
   ) : (
