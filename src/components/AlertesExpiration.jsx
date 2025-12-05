@@ -23,7 +23,7 @@ export default function AlertesExpirationCardsStyled() {
   const [filter, setFilter] = useState("toutes");
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const ITEMS_PER_PAGE = 6;
+  const ITEMS_PER_PAGE = 60;
 
   useEffect(() => {
     const fetchData = async () => {
