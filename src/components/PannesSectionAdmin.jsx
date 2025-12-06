@@ -1,4 +1,4 @@
-// src/components/PannesSectionAdmin.jsx (Corrigé)
+// src/components/PannesSectionAdmin.jsx
 
 import React, { useState, useMemo } from "react";
 import PannesDeclareesCardsBaticom from "./PannesDeclareesCardsBaticom.jsx";
@@ -19,10 +19,10 @@ export default function PannesSectionAdmin() {
   }, [activeTab]);
 
   return (
-    <div className="flex-1 flex flex-col min-h-screen py-6 animate-fadeInUp bg-gray-50 dark:bg-gray-900">
-      
+    <div className="flex-1 flex flex-col min-h-screen space-y-4 animate-fadeInUp">
+
       {/* Tabs */}
-      <div className="flex gap-2 flex-wrap justify-center md:justify-start px-4 md:px-6 lg:px-8 mb-4">
+      <div className="flex gap-2 flex-wrap justify-center md:justify-start mb-4">
         {TABS.map((tab) => (
           <Button
             key={tab.id}
@@ -40,15 +40,15 @@ export default function PannesSectionAdmin() {
         ))}
       </div>
 
-      {/* Section dynamique - MODIFICATION CLÉ */}
-      <div className="flex-1 space-y-4 px-4 md:px-6 lg:px-8">
-        {/* Enveloppez ActiveComponent dans un conteneur pour appliquer le style de fond/ombre et supprimer le padding redondant */}
+      {/* Section dynamique */}
+      <div className="flex-1 space-y-4">
         {ActiveComponent && (
           <div className="bg-white/80 dark:bg-gray-800/80 rounded-xl shadow-lg backdrop-blur-sm">
             <ActiveComponent />
           </div>
         )}
       </div>
+
     </div>
   );
 }

@@ -7,9 +7,9 @@ import ConfirmDialog from "./ui/ConfirmDialog.jsx";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { 
+import { 
   Bell, MapPin, FileText, File, X, Wrench, CheckCircle, AlertTriangle, Loader2,
-  User, Clock, Calendar, Trash2, Truck
+  User, Clock, Calendar, Trash2, Truck, Download
 } from "lucide-react";
 
 export default function PannesDeclareesCardsGts() {
@@ -131,7 +131,6 @@ export default function PannesDeclareesCardsGts() {
       const chauffeur = chauffeurs.find(c => c.id.toString() === p.chauffeur_id.toString());
       if (chauffeur) return chauffeur.name;
     }
-    console.log("Chauffeur inconnu pour panne:", p);
     return "Inconnu";
   };
 
@@ -193,8 +192,15 @@ export default function PannesDeclareesCardsGts() {
     return matchFilter && matchSearch;
   });
 
-  const totalPages = Math.ceil(filteredPannes.length / ITEMS_PER_PAGE);
-  const paginatedPannes = filteredPannes.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+  // Tri : "en_cours" en haut puis date décroissante (Harmonisation)
+  const sortedPannes = filteredPannes.sort((a, b) => {
+    if (a.statut === "en_cours" && b.statut !== "en_cours") return -1;
+    if (a.statut !== "en_cours" && b.statut === "en_cours") return 1;
+    return new Date(b.created_at) - new Date(a.created_at);
+  });
+
+  const totalPages = Math.ceil(sortedPannes.length / ITEMS_PER_PAGE);
+  const paginatedPannes = sortedPannes.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
   // --- Export Excel / PDF ---
   const exportExcel = () => {
@@ -263,7 +269,8 @@ export default function PannesDeclareesCardsGts() {
 
   // --- Render ---
   return (
-    <div className="p-4 sm:p-6 space-y-6 container max-w-[1440px] mx-auto">
+    // MODIFICATION CLÉ : Retrait des classes container, max-w-[1440px] et mx-auto
+    <div className="p-4 sm:p-6 space-y-6"> 
       {/* Header */}
       <Card className="shadow-xl bg-white/90 dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
         <CardHeader className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 sm:p-6 gap-2 sm:gap-0">
@@ -272,7 +279,7 @@ export default function PannesDeclareesCardsGts() {
           </h2>
           <div className="flex gap-2 flex-wrap">
             <Button onClick={exportExcel} variant="outline" className="flex items-center gap-1 border-green-500 text-green-600 dark:text-green-400 dark:border-green-600 hover:bg-green-50 dark:hover:bg-green-900/30 hover:text-green-700 dark:hover:text-green-200">
-              <File size={16} /> Export Excel
+              <Download size={16} /> Export Excel
             </Button>
             <Button onClick={exportPDF} variant="outline" className="flex items-center gap-1 border-red-500 text-red-600 dark:text-red-400 dark:border-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 hover:text-red-700 dark:hover:text-red-200">
               <FileText size={16} /> Export PDF
@@ -281,7 +288,7 @@ export default function PannesDeclareesCardsGts() {
         </CardHeader>
 
         {/* Filtre + Recherche */}
-        <div className="flex flex-wrap gap-3 items-center justify-between bg-white dark:bg-gray-800 p-4 rounded-xl shadow border border-gray-100 dark:border-gray-700">
+        <div className="flex flex-wrap gap-3 items-center justify-between bg-white/80 dark:bg-gray-800/80 p-4 rounded-xl shadow border border-gray-100 dark:border-gray-700 backdrop-blur-sm">
           <input
             type="text"
             placeholder="🔍 Rechercher (Journée, Chauffeur, Camion, Type, Heure...)"
@@ -313,9 +320,9 @@ export default function PannesDeclareesCardsGts() {
             <span>Chargement des données...</span>
           </div>
         ) : paginatedPannes.length === 0 ? (
-          <p className="text-center col-span-full text-gray-500 dark:text-gray-400 p-10 bg-white dark:bg-gray-800 rounded-xl shadow">Aucune panne trouvée avec les filtres actuels</p>
+          <p className="text-center col-span-full text-gray-500 dark:text-gray-400 p-10 bg-white/80 dark:bg-gray-800/80 rounded-xl shadow backdrop-blur-sm">Aucune panne trouvée avec les filtres actuels</p>
         ) : paginatedPannes.map(p => (
-          <Card key={p.id} className="shadow-lg p-5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 flex flex-col justify-between hover:shadow-xl transition duration-300">
+          <Card key={p.id} className="shadow-lg p-5 bg-white/70 dark:bg-gray-800/70 border border-gray-200 dark:border-gray-700 flex flex-col justify-between hover:shadow-xl transition duration-300 backdrop-blur-sm">
             <CardContent className="p-0 space-y-3">
               <div className="flex justify-between items-center pb-2 border-b border-gray-100 dark:border-gray-700/50">
                 {getStatusBadge(p.statut)}
@@ -346,36 +353,41 @@ export default function PannesDeclareesCardsGts() {
               <div className="flex gap-2 flex-wrap pt-4 border-t border-gray-200 dark:border-gray-700">
                 {p.latitude && p.longitude && (
                   <a
-                    href={`https://www.google.com/maps/search/?api=1&query=${p.latitude},${p.longitude}`}
+                    href={`http://maps.google.com/?q=${p.latitude},${p.longitude}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 rounded text-xs flex items-center gap-1"
+                    // Remplacer par le style Button pour l'harmonisation
+                    className="flex items-center gap-1 text-sm bg-blue-600 hover:bg-blue-700 text-white dark:bg-blue-700 dark:hover:bg-blue-800 rounded-lg px-3 py-1 transition-colors"
                   >
                     <MapPin size={14} /> Localisation
                   </a>
                 )}
                 {p.photo && (
-                  <button
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="dark:text-gray-100 dark:border-gray-600 dark:bg-gray-700"
                     onClick={() => { setSelectedPanne(p); setShowPhotoModal(true); }}
-                    className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 rounded text-xs flex items-center gap-1"
                   >
-                    <File size={14} /> Photo
-                  </button>
+                    <File size={14} className="mr-1" /> Voir photo
+                  </Button>
                 )}
                 {p.statut !== "resolu" && (
-                  <button
+                  <Button
+                    size="sm"
+                    className="bg-green-600 hover:bg-green-700 text-white dark:bg-green-700 dark:hover:bg-green-800"
                     onClick={() => handleTraiterPanne(p)}
-                    className="px-2 py-1 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 rounded text-xs flex items-center gap-1"
                   >
-                    <CheckCircle size={14} /> Traiter
-                  </button>
+                    <CheckCircle size={14} className="mr-1" /> Traiter
+                  </Button>
                 )}
-                <button
+                <Button
+                  size="sm"
+                  variant="destructive"
                   onClick={() => { setPanneToDelete(p); setShowModalConfirm(true); }}
-                  className="px-2 py-1 bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200 rounded text-xs flex items-center gap-1"
                 >
-                  <Trash2 size={14} /> Supprimer
-                </button>
+                  <Trash2 size={14} className="mr-1" /> Supprimer
+                </Button>
               </div>
             </CardContent>
           </Card>
@@ -385,28 +397,32 @@ export default function PannesDeclareesCardsGts() {
       {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex justify-center items-center gap-2 mt-6">
-          <Button onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} disabled={currentPage === 1}>Précédent</Button>
-          <span className="px-2 py-1 text-gray-700 dark:text-gray-200">{currentPage} / {totalPages}</span>
-          <Button onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} disabled={currentPage === totalPages}>Suivant</Button>
+          <Button onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} disabled={currentPage === 1} variant="outline">Précédent</Button>
+          <span className="px-2 py-1 text-gray-700 dark:text-gray-200 font-medium">Page {currentPage} / {totalPages}</span>
+          <Button onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} disabled={currentPage === totalPages} variant="outline">Suivant</Button>
         </div>
       )}
 
       {/* Modales */}
       {showPhotoModal && selectedPanne && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white dark:bg-gray-800 p-4 rounded-lg max-w-lg w-full relative">
-            <button onClick={() => setShowPhotoModal(false)} className="absolute top-2 right-2 text-gray-700 dark:text-gray-200"><X size={20} /></button>
-            <img src={getPhotoUrl(selectedPanne)} alt="Panne" className="max-w-full max-h-[80vh] object-contain rounded" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+          <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-2xl max-w-lg w-full relative">
+            <h3 className="text-lg font-bold mb-2 text-gray-900 dark:text-gray-100">Photo de la Panne</h3>
+            <button onClick={() => setShowPhotoModal(false)} className="absolute top-4 right-4 text-gray-700 dark:text-gray-200 hover:text-red-500 transition-colors"><X size={24} /></button>
+            <img src={getPhotoUrl(selectedPanne)} alt="Panne" className="w-full h-auto object-contain rounded-lg border border-gray-200 dark:border-gray-700" />
           </div>
         </div>
       )}
 
       {showModalConfirm && panneToDelete && (
         <ConfirmDialog
-          title="Confirmation suppression"
-          description={`Voulez-vous vraiment supprimer la panne "${panneToDelete.typepanne}" ? Cette action est irréversible.`}
+          open={showModalConfirm}
+          onClose={() => setShowModalConfirm(false)}
+          title="Supprimer cette Panne ?"
+          description={`Êtes-vous sûr de vouloir supprimer l'alerte de panne "${panneToDelete.typepanne}" ? Cette action est irréversible.`}
+          confirmLabel="Supprimer définitivement"
+          confirmColor="bg-red-600 hover:bg-red-700"
           onConfirm={confirmDelete}
-          onCancel={() => setShowModalConfirm(false)}
         />
       )}
     </div>

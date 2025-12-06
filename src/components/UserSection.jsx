@@ -19,6 +19,7 @@ const renderDocuments = (u) => {
     { url: u.carteurl, label: "Carte Transport", expiry: u.carte_expiration },
     { url: u.actenaissanceurl, label: "Acte Naissance" }
   ];
+
   docList.forEach(({ url, label, expiry }, i) => {
     if (url) {
       const expired = expiry && new Date(expiry) < new Date();
@@ -28,14 +29,26 @@ const renderDocuments = (u) => {
           href={url}
           target="_blank"
           rel="noopener noreferrer"
-          className={`text-blue-600 dark:text-blue-400 hover:underline text-sm flex items-center gap-1 ${expired ? "line-through" : ""}`}
+          className={`text-blue-600 dark:text-blue-400 hover:underline text-sm flex items-center gap-1 ${
+            expired ? "line-through" : ""
+          }`}
         >
-          <FileText size={14} /> {label} {expiry && <span className="text-xs text-gray-500 dark:text-gray-300">({new Date(expiry).toLocaleDateString()})</span>}
+          <FileText size={14} /> {label}
+          {expiry && (
+            <span className="text-xs text-gray-500 dark:text-gray-300">
+              ({new Date(expiry).toLocaleDateString()})
+            </span>
+          )}
         </a>
       );
     }
   });
-  return docs.length ? <div className="flex flex-col gap-1 mt-1">{docs}</div> : <span className="text-gray-400 italic text-sm">Aucun document</span>;
+
+  return docs.length ? (
+    <div className="flex flex-col gap-1 mt-1">{docs}</div>
+  ) : (
+    <span className="text-gray-400 italic text-sm">Aucun document</span>
+  );
 };
 
 export default function UsersSection() {
@@ -49,31 +62,65 @@ export default function UsersSection() {
   const [roleFilter, setRoleFilter] = useState("");
   const [structureFilter, setStructureFilter] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+
   const ITEMS_PER_PAGE = 5;
 
   const fetchUsers = useCallback(async () => {
-    const { data, error } = await supabase.from("profiles").select("*").order("created_at", { ascending: false });
-    if (error) toast({ title: "Erreur de chargement", description: error.message, variant: "destructive" });
-    else setUsers(data || []);
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      toast({
+        title: "Erreur de chargement",
+        description: error.message,
+        variant: "destructive"
+      });
+    } else {
+      setUsers(data || []);
+    }
   }, [toast]);
 
-  useEffect(() => { fetchUsers(); }, [fetchUsers]);
+  useEffect(() => {
+    fetchUsers();
+  }, [fetchUsers]);
 
   const confirmDelete = async () => {
     try {
-      const { error } = await supabase.from("profiles").delete().eq("id", userToDelete.id);
+      const { error } = await supabase
+        .from("profiles")
+        .delete()
+        .eq("id", userToDelete.id);
+
       if (error) throw error;
-      toast({ title: "Utilisateur supprimé", description: `L'utilisateur "${userToDelete.name}" a été supprimé.` });
+
+      toast({
+        title: "Utilisateur supprimé",
+        description: `L'utilisateur "${userToDelete.name}" a été supprimé.`
+      });
+
       fetchUsers();
       setUserToDelete(null);
       setConfirmOpen(false);
     } catch (err) {
-      toast({ title: "Erreur", description: err.message, variant: "destructive" });
+      toast({
+        title: "Erreur",
+        description: err.message,
+        variant: "destructive"
+      });
     }
   };
 
-  const handleEdit = (u) => { setEditingUser(u); setShowModal(true); };
-  const handleAdd = () => { setEditingUser(null); setShowModal(true); };
+  const handleEdit = (u) => {
+    setEditingUser(u);
+    setShowModal(true);
+  };
+
+  const handleAdd = () => {
+    setEditingUser(null);
+    setShowModal(true);
+  };
 
   const filteredUsers = users.filter(
     (u) =>
@@ -83,7 +130,11 @@ export default function UsersSection() {
   );
 
   const totalPages = Math.ceil(filteredUsers.length / ITEMS_PER_PAGE);
-  const paginatedUsers = filteredUsers.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+
+  const paginatedUsers = filteredUsers.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
 
   const exportExcel = () => {
     const wsData = filteredUsers.map((u) => ({
@@ -100,39 +151,62 @@ export default function UsersSection() {
       "Exp. Carte Transport": u.carte_expiration || "",
       "Acte Naissance": u.actenaissanceurl ? "Oui" : ""
     }));
+
     const ws = XLSX.utils.json_to_sheet(wsData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Utilisateurs");
     XLSX.writeFile(wb, "liste_utilisateurs.xlsx");
-    toast({ title: "Export Excel", description: "Liste des utilisateurs exportée." });
+
+    toast({
+      title: "Export Excel",
+      description: "Liste des utilisateurs exportée."
+    });
   };
 
   const exportPDF = () => {
     const doc = new jsPDF();
+
     doc.setFontSize(16);
     doc.text("Liste des Utilisateurs", 14, 20);
     doc.setFontSize(10);
     doc.text(`Généré le: ${new Date().toLocaleString()}`, 14, 28);
+
     autoTable(doc, {
       startY: 35,
       head: [["Nom", "Email", "Téléphone", "Rôle", "Structure"]],
-      body: filteredUsers.map((u) => [u.name, u.email, u.phone || "-", u.role, u.structure || "-"]),
+      body: filteredUsers.map((u) => [
+        u.name,
+        u.email,
+        u.phone || "-",
+        u.role,
+        u.structure || "-"
+      ]),
       theme: "grid",
-      styles: { fontSize: 9 },
+      styles: { fontSize: 9 }
     });
+
     doc.save("liste_utilisateurs.pdf");
-    toast({ title: "Export PDF", description: "Le document a été généré." });
+
+    toast({
+      title: "Export PDF",
+      description: "Le document a été généré."
+    });
   };
 
   return (
-    <div className="p-3 sm:p-6 space-y-6 container animate-fadeInUp">
+    <div className="space-y-6 animate-fadeInUp">
       {/* Header */}
       <Card className="shadow-lg bg-white/80 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 backdrop-blur-sm">
         <CardHeader className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
           <h2 className="text-xl sm:text-2xl font-bold text-gray-800 dark:text-gray-100 flex items-center gap-3">
-            <UserIcon size={24} className="text-blue-600 dark:text-blue-400" /> Gestion des Utilisateurs
+            <UserIcon size={24} className="text-blue-600 dark:text-blue-400" />
+            Gestion des Utilisateurs
           </h2>
-          <Button onClick={handleAdd} className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white">
+
+          <Button
+            onClick={handleAdd}
+            className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white"
+          >
             + Créer Utilisateur
           </Button>
         </CardHeader>
@@ -144,12 +218,19 @@ export default function UsersSection() {
           type="text"
           placeholder="🔍 Rechercher..."
           value={searchTerm}
-          onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+          onChange={(e) => {
+            setSearchTerm(e.target.value);
+            setCurrentPage(1);
+          }}
           className="flex-1 min-w-[150px] border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white text-gray-800 dark:bg-gray-700 dark:text-gray-200"
         />
+
         <select
           value={roleFilter}
-          onChange={(e) => { setRoleFilter(e.target.value); setCurrentPage(1); }}
+          onChange={(e) => {
+            setRoleFilter(e.target.value);
+            setCurrentPage(1);
+          }}
           className="border rounded px-2 py-1 bg-white text-gray-800 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600"
         >
           <option value="">Tous rôles</option>
@@ -157,47 +238,104 @@ export default function UsersSection() {
           <option value="superviseur">Superviseur</option>
           <option value="admin">Admin</option>
         </select>
+
         <select
           value={structureFilter}
-          onChange={(e) => { setStructureFilter(e.target.value); setCurrentPage(1); }}
+          onChange={(e) => {
+            setStructureFilter(e.target.value);
+            setCurrentPage(1);
+          }}
           className="border rounded px-2 py-1 bg-white text-gray-800 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600"
         >
           <option value="">Toutes structures</option>
           <option value="BATICOM">BATICOM</option>
           <option value="GTS">GTS</option>
         </select>
+
         <div className="flex gap-2">
-          <Button onClick={exportExcel} variant="outline" className="border-green-500 text-green-600 dark:text-green-400">Excel</Button>
-          <Button onClick={exportPDF} variant="outline" className="border-red-500 text-red-600 dark:text-red-400">PDF</Button>
+          <Button
+            onClick={exportExcel}
+            variant="outline"
+            className="border-green-500 text-green-600 dark:text-green-400"
+          >
+            Excel
+          </Button>
+          <Button
+            onClick={exportPDF}
+            variant="outline"
+            className="border-red-500 text-red-600 dark:text-red-400"
+          >
+            PDF
+          </Button>
         </div>
       </div>
 
       {/* Liste des cartes */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {paginatedUsers.length === 0 ? (
-          <p className="text-center col-span-full text-gray-500 dark:text-gray-400">Aucun utilisateur trouvé</p>
+          <p className="text-center col-span-full text-gray-500 dark:text-gray-400">
+            Aucun utilisateur trouvé
+          </p>
         ) : (
           paginatedUsers.map((u) => (
-            <Card key={u.id} className="shadow-lg p-4 bg-white/70 dark:bg-gray-800/70 border border-gray-200 dark:border-gray-700 backdrop-blur-sm">
+            <Card
+              key={u.id}
+              className="shadow-lg p-4 bg-white/70 dark:bg-gray-800/70 border border-gray-200 dark:border-gray-700 backdrop-blur-sm"
+            >
               <div className="flex justify-between items-start">
                 <div>
                   <h3 className="font-bold text-lg text-gray-800 dark:text-white flex items-center gap-2">
                     <UserIcon size={18} /> {u.name}
                   </h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-300">Email: {u.email}</p>
-                  {u.phone && <p className="text-sm text-gray-600 dark:text-gray-300">Tel: {u.phone}</p>}
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Rôle: {u.role}</p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Structure: {u.structure || "-"}</p>
+
+                  <p className="text-sm text-gray-600 dark:text-gray-300">
+                    Email: {u.email}
+                  </p>
+
+                  {u.phone && (
+                    <p className="text-sm text-gray-600 dark:text-gray-300">
+                      Tel: {u.phone}
+                    </p>
+                  )}
+
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                    Rôle: {u.role}
+                  </p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    Structure: {u.structure || "-"}
+                  </p>
                 </div>
+
                 <div className="flex gap-2">
-                  <Button variant="outline" size="icon" onClick={() => handleEdit(u)} className="bg-white/50 dark:bg-gray-700/50 hover:bg-white/70 dark:hover:bg-gray-600/60 transition">
-                    <Pencil size={16} className="text-gray-800 dark:text-gray-200 opacity-80 hover:opacity-100 transition" />
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => handleEdit(u)}
+                    className="bg-white/50 dark:bg-gray-700/50 hover:bg-white/70 dark:hover:bg-gray-600/60 transition"
+                  >
+                    <Pencil
+                      size={16}
+                      className="text-gray-800 dark:text-gray-200 opacity-80 hover:opacity-100 transition"
+                    />
                   </Button>
-                  <Button variant="destructive" size="icon" onClick={() => { setUserToDelete(u); setConfirmOpen(true); }} className="bg-white/50 dark:bg-gray-700/50 hover:bg-white/70 dark:hover:bg-gray-600/60 transition">
-                    <Trash2 size={16} className="text-red-600 dark:text-red-400 opacity-80 hover:opacity-100 transition" />
+
+                  <Button
+                    variant="destructive"
+                    size="icon"
+                    onClick={() => {
+                      setUserToDelete(u);
+                      setConfirmOpen(true);
+                    }}
+                    className="bg-white/50 dark:bg-gray-700/50 hover:bg-white/70 dark:hover:bg-gray-600/60 transition"
+                  >
+                    <Trash2
+                      size={16}
+                      className="text-red-600 dark:text-red-400 opacity-80 hover:opacity-100 transition"
+                    />
                   </Button>
                 </div>
               </div>
+
               <div className="mt-3">{renderDocuments(u)}</div>
             </Card>
           ))
@@ -222,7 +360,14 @@ export default function UsersSection() {
       )}
 
       {/* Modals */}
-      {showModal && <UserModal editingUser={editingUser} setShowModal={setShowModal} fetchUsers={fetchUsers} />}
+      {showModal && (
+        <UserModal
+          editingUser={editingUser}
+          setShowModal={setShowModal}
+          fetchUsers={fetchUsers}
+        />
+      )}
+
       <ConfirmDialog
         open={confirmOpen}
         onClose={setConfirmOpen}

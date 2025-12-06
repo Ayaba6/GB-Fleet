@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from "react";
 import MissionsSectionBaticom from "./MissionsSectionBaticom.jsx";
-import MissionsSectionGts from "./MissionsSectionGts.jsx"; // La modification s'applique aussi à GTS
+import MissionsSectionGts from "./MissionsSectionGts.jsx";
 import { Button } from "./ui/button.jsx";
 
 const TABS = [
@@ -19,10 +19,10 @@ export default function MissionsSectionAdmin() {
   }, [activeTab]);
 
   return (
-    <div className="flex-1 flex flex-col min-h-screen py-6 animate-fadeInUp bg-gray-50 dark:bg-gray-900">
+    <div className="flex-1 flex flex-col min-h-screen space-y-4 animate-fadeInUp">
       
       {/* Tabs */}
-      <div className="flex gap-2 flex-wrap justify-center md:justify-start px-4 md:px-6 lg:px-8 mb-4">
+      <div className="flex gap-2 flex-wrap justify-center md:justify-start mb-4">
         {TABS.map((tab) => (
           <Button
             key={tab.id}
@@ -41,14 +41,14 @@ export default function MissionsSectionAdmin() {
       </div>
 
       {/* Section dynamique */}
-      <div className="flex-1 px-4 md:px-6 lg:px-8 space-y-4">
+      <div className="flex-1 space-y-4">
         {ActiveComponent && (
-          // MODIFICATION CLÉ : Suppression du padding "p-6" autour de l'ActiveComponent
           <div className="bg-white/80 dark:bg-gray-800/80 rounded-xl shadow-lg backdrop-blur-sm">
             <ActiveComponent />
           </div>
         )}
       </div>
+
     </div>
   );
 }
