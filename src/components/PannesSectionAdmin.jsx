@@ -1,3 +1,5 @@
+// src/components/PannesSectionAdmin.jsx (Corrigé)
+
 import React, { useState, useMemo } from "react";
 import PannesDeclareesCardsBaticom from "./PannesDeclareesCardsBaticom.jsx";
 import PannesDeclareesCardsGTS from "./PannesDeclareesCardsGTS.jsx";
@@ -38,9 +40,14 @@ export default function PannesSectionAdmin() {
         ))}
       </div>
 
-      {/* Section dynamique */}
+      {/* Section dynamique - MODIFICATION CLÉ */}
       <div className="flex-1 space-y-4 px-4 md:px-6 lg:px-8">
-        {ActiveComponent && <ActiveComponent />}
+        {/* Enveloppez ActiveComponent dans un conteneur pour appliquer le style de fond/ombre et supprimer le padding redondant */}
+        {ActiveComponent && (
+          <div className="bg-white/80 dark:bg-gray-800/80 rounded-xl shadow-lg backdrop-blur-sm">
+            <ActiveComponent />
+          </div>
+        )}
       </div>
     </div>
   );

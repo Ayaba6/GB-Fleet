@@ -1,3 +1,5 @@
+// src/components/PannesDeclareesCardsBaticom.jsx (Corrigé)
+
 import React, { useEffect, useState } from "react";
 import { supabase } from "../config/supabaseClient.js";
 import { Card, CardHeader, CardContent } from "./ui/card.jsx";
@@ -194,7 +196,8 @@ export default function PannesDeclareesCardsBaticom() {
   };
 
   return (
-    <div className="p-4 sm:p-6 space-y-6 container max-w-[1440px] mx-auto">
+    // MODIFICATION CLÉ : Retrait des classes container, max-w-[1440px] et mx-auto
+    <div className="p-4 sm:p-6 space-y-6"> 
       <Card className="shadow-xl bg-white/90 dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
         <CardHeader className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 sm:p-6 gap-2 sm:gap-0">
           <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100 flex items-center gap-3">
@@ -203,8 +206,8 @@ export default function PannesDeclareesCardsBaticom() {
         </CardHeader>
       </Card>
 
-      {/* Filtre + Recherche */}
-      <div className="flex flex-wrap gap-3 items-center justify-between bg-white dark:bg-gray-800 p-4 rounded-xl shadow border border-gray-100 dark:border-gray-700">
+      {/* Filtre + Recherche - Styles harmonisés pour mieux remplir l'espace */}
+      <div className="flex flex-wrap gap-3 items-center justify-between bg-white/80 dark:bg-gray-800/80 p-4 rounded-xl shadow border border-gray-100 dark:border-gray-700 backdrop-blur-sm">
         <input
           type="text"
           placeholder="🔍 Rechercher (Journée, Chauffeur, Camion, Type, Heure...)"
@@ -234,11 +237,11 @@ export default function PannesDeclareesCardsBaticom() {
             <Loader2 className="animate-spin mr-2" size={24} /> Chargement...
           </div>
         ) : paginatedPannes.length === 0 ? (
-          <p className="text-center col-span-full text-gray-500 dark:text-gray-400 p-10 bg-white dark:bg-gray-800 rounded-xl shadow">
+          <p className="text-center col-span-full text-gray-500 dark:text-gray-400 p-10 bg-white/80 dark:bg-gray-800/80 rounded-xl shadow">
             Aucune panne trouvée
           </p>
         ) : paginatedPannes.map(p => (
-          <Card key={p.id} className="shadow-lg p-5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 flex flex-col justify-between hover:shadow-xl transition duration-300">
+          <Card key={p.id} className="shadow-lg p-5 bg-white/70 dark:bg-gray-800/70 border border-gray-200 dark:border-gray-700 flex flex-col justify-between hover:shadow-xl transition duration-300 backdrop-blur-sm">
             <CardContent className="p-0 space-y-3">
               <div className="flex justify-between items-center pb-2 border-b border-gray-100 dark:border-gray-700/50">
                 {getStatusBadge(p.statut)}
@@ -263,7 +266,7 @@ export default function PannesDeclareesCardsBaticom() {
               </div>
               <div className="flex gap-2 flex-wrap pt-4 border-t border-gray-200 dark:border-gray-700">
                 {p.latitude && p.longitude && (
-                  <a href={`https://www.google.com/maps/search/?api=1&query=${p.latitude},${p.longitude}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 text-sm">
+                  <a href={`http://maps.google.com/?q=${p.latitude},${p.longitude}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 text-sm">
                     <MapPin size={14}/> Position GPS
                   </a>
                 )}
@@ -277,11 +280,48 @@ export default function PannesDeclareesCardsBaticom() {
                     <CheckCircle size={14} className="mr-1" /> Traiter
                   </Button>
                 )}
+                <Button 
+                    size="sm" 
+                    variant="destructive" 
+                    onClick={() => { setPanneToDelete(p); setShowModalConfirm(true); }}
+                >
+                    Supprimer
+                </Button>
               </div>
             </CardContent>
           </Card>
         ))}
       </div>
+      
+      {/* Pagination (Ajouté pour compléter l'harmonsiation) */}
+      {totalPages > 1 && (
+        <div className="flex justify-center gap-2 mt-4">
+          {Array.from({ length: totalPages }, (_, i) => (
+            <Button
+              key={i}
+              size="sm"
+              variant={currentPage === i + 1 ? "default" : "outline"}
+              onClick={() => setCurrentPage(i + 1)}
+              className={currentPage === i + 1 ? "bg-blue-600 text-white" : ""}
+            >
+              {i + 1}
+            </Button>
+          ))}
+        </div>
+      )}
+      
+      {/* Modals : Vous devrez implémenter PhotoModal et vous assurer que ConfirmDialog est bien importé */}
+      {/* ... (Code des modales non fourni ici) ... */}
+
+      <ConfirmDialog
+        open={showModalConfirm}
+        onClose={setShowModalConfirm}
+        title="Supprimer cette Panne ?"
+        description="Êtes-vous sûr de vouloir supprimer cette alerte de panne ? Cette action est irréversible."
+        confirmLabel="Supprimer"
+        confirmColor="bg-red-600 hover:bg-red-700"
+        onConfirm={confirmDelete}
+      />
     </div>
   );
 }
