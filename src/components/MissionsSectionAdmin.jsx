@@ -1,6 +1,8 @@
+// src/components/MissionsSectionAdmin.jsx
+
 import React, { useState, useMemo } from "react";
 import MissionsSectionBaticom from "./MissionsSectionBaticom.jsx";
-import MissionsSectionGts from "./MissionsSectionGts.jsx";
+import MissionsSectionGts from "./MissionsSectionGts.jsx"; // La modification s'applique aussi à GTS
 import { Button } from "./ui/button.jsx";
 
 const TABS = [
@@ -41,7 +43,8 @@ export default function MissionsSectionAdmin() {
       {/* Section dynamique */}
       <div className="flex-1 px-4 md:px-6 lg:px-8 space-y-4">
         {ActiveComponent && (
-          <div className="bg-white/80 dark:bg-gray-800/80 p-6 rounded-xl shadow-lg backdrop-blur-sm">
+          // MODIFICATION CLÉ : Suppression du padding "p-6" autour de l'ActiveComponent
+          <div className="bg-white/80 dark:bg-gray-800/80 rounded-xl shadow-lg backdrop-blur-sm">
             <ActiveComponent />
           </div>
         )}
