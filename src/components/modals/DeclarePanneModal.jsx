@@ -146,11 +146,10 @@ export default function DeclarePanneModal({ open, onClose, chauffeurId, missionI
       photoPath = storagePath;
     }
 
-    // ✅ ICI ON FORCE BATICOM
     const { error } = await supabase.from("alertespannes").insert({
       chauffeur_id: chauffeurId,
       mission_id: missionId,
-      structure: "BATICOM", // FORCÉ
+      structure: "BATICOM",
       typepanne: type,
       description,
       photo: photoPath,
@@ -232,7 +231,7 @@ export default function DeclarePanneModal({ open, onClose, chauffeurId, missionI
             <Label>Type de panne</Label>
             <Select value={type} onValueChange={setType}>
               <SelectTrigger>
-                <SelectValue placeholder="Sélectionnez..." />
+                <SelectValue value={type} placeholder="Sélectionnez..." />
               </SelectTrigger>
               <SelectContent>
                 {PANNE_TYPES.map((p) => (

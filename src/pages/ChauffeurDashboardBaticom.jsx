@@ -23,9 +23,8 @@ import {
     AlertTriangle,
 } from "lucide-react";
 
-// Imports des composants spécifiques
 import DeclarePanneModal from "../components/modals/DeclarePanneModal.jsx";
-import HistoriqueJourneeChauffeur from "../components/HistoriqueJourneeChauffeur.jsx"; 
+import HistoriqueJourneeChauffeur from "../components/HistoriqueJourneeChauffeur.jsx"; 
 
 // --- Header fixe ---
 const DashboardHeader = ({
@@ -114,19 +113,12 @@ const BottomNavigation = ({ activeTab, setActiveTab }) => {
 };
 
 // --- Dashboard Content (Accueil) ---
-const DashboardContent = ({ journee, voyages, handleStartDay, handleCloseDay, setPanneDialog }) => {
+const DashboardContent = ({ journee, voyages, handleStartDay, setPanneDialog }) => {
     const statutJournee = journee?.statut || "N/A";
     const isStarted = !!journee?.heure_depart;
-    const isClosed = statutJournee === "clôturée";
 
     let statusBadge;
-    if (isClosed)
-        statusBadge = (
-            <span className="px-3 py-1 text-sm font-semibold rounded-full bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300">
-                Clôturée
-            </span>
-        );
-    else if (isStarted)
+    if (isStarted)
         statusBadge = (
             <span className="px-3 py-1 text-sm font-semibold rounded-full bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300">
                 En Cours
@@ -178,7 +170,7 @@ const DashboardContent = ({ journee, voyages, handleStartDay, handleCloseDay, se
                     <DetailItem icon={Calendar} label="Date" value={new Date(journee.date).toLocaleDateString()} />
                     <DetailItem icon={Truck} label="Camion" value={journee.camions?.numero_camion || "N/A"} />
                     <DetailItem icon={Clock} label="Départ" value={journee.heure_depart ? new Date(journee.heure_depart).toLocaleTimeString() : "Non démarré"} />
-                    <DetailItem icon={Clock} label="Clôture" value={journee.heure_cloture ? new Date(journee.heure_cloture).toLocaleTimeString() : "Non clôturée"} />
+                    <DetailItem icon={Clock} label="Clôture" value={"Non clôturée"} />
                     <DetailItem icon={Fuel} label="Carburant Initial" value={`${journee.fuel_restant ?? "N/A"} L`} />
                     <DetailItem icon={Fuel} label="Carburant Compl." value={`${journee.fuel_complement ?? "N/A"} L`} />
                 </div>
@@ -202,7 +194,7 @@ const DashboardContent = ({ journee, voyages, handleStartDay, handleCloseDay, se
                 )}
 
                 <div className="pt-4 border-t border-gray-200 dark:border-gray-700 space-y-3">
-                    {!isStarted && !isClosed && (
+                    {!isStarted && (
                         <Button
                             onClick={handleStartDay}
                             className="bg-green-600 hover:bg-green-700 text-white w-full text-lg font-semibold h-12 shadow-lg hover:shadow-xl transition-shadow"
@@ -211,22 +203,14 @@ const DashboardContent = ({ journee, voyages, handleStartDay, handleCloseDay, se
                         </Button>
                     )}
 
-                    {isStarted && !isClosed && (
+                    {isStarted && (
                         <Button
-                            onClick={handleCloseDay}
-                            className="bg-red-600 hover:bg-red-700 text-white w-full text-lg font-semibold h-12 shadow-lg hover:shadow-xl transition-shadow"
+                            onClick={() => setPanneDialog(true)}
+                            className="w-full h-10 flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white font-medium"
                         >
-                            Clôturer la Journée
+                            <Wrench size={18} /> Déclarer une panne
                         </Button>
                     )}
-
-                    <Button
-                        onClick={() => setPanneDialog(true)}
-                        className="w-full h-10 flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white font-medium"
-                        disabled={!journee || isClosed}
-                    >
-                        <Wrench size={18} /> Déclarer une panne
-                    </Button>
                 </div>
             </CardContent>
         </Card>
@@ -235,8 +219,7 @@ const DashboardContent = ({ journee, voyages, handleStartDay, handleCloseDay, se
 
 // --- Composant Principal ---
 export default function ChauffeurDashboardBaticom({ session }) {
-    // L'ID du chauffeur est tiré de la session
-    const chauffeurId = session?.user?.id; 
+    const chauffeurId = session?.user?.id;
     const { toast } = useToast();
 
     const [journee, setJournee] = useState(null);
@@ -246,17 +229,15 @@ export default function ChauffeurDashboardBaticom({ session }) {
         typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches
     );
     const [voyages, setVoyages] = useState([]);
-    const [activeTab, setActiveTab] = useState("dashboard"); // Onglet actif par défaut
+    const [activeTab, setActiveTab] = useState("dashboard");
     const [openProfileMenu, setOpenProfileMenu] = useState(false);
 
     const profileMenuRef = useRef();
 
-    // Appliquer dark/light mode
     useEffect(() => {
         document.documentElement.classList.toggle("dark", darkMode);
     }, [darkMode]);
 
-    // Fermer menu profil si clic à l'extérieur
     useEffect(() => {
         const handleClickOutside = (event) => {
             if (profileMenuRef.current && !profileMenuRef.current.contains(event.target)) {
@@ -267,12 +248,10 @@ export default function ChauffeurDashboardBaticom({ session }) {
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
-    // Récupérer la journée ouverte et les voyages associés (Logique essentielle)
     const fetchJournee = useCallback(async () => {
         if (!chauffeurId) return;
         setLoading(true);
         try {
-            // Requête pour la journée en cours
             const { data, error } = await supabase
                 .from("journee_baticom")
                 .select("*, camions(*)")
@@ -284,7 +263,6 @@ export default function ChauffeurDashboardBaticom({ session }) {
             setJournee(data || null);
 
             if (data) {
-                // Requête pour les voyages associés à cette journée
                 const { data: voyagesData, error: voyagesError } = await supabase
                     .from("journee_voyages")
                     .select("id, voyage_num, tonnage")
@@ -303,11 +281,8 @@ export default function ChauffeurDashboardBaticom({ session }) {
         }
     }, [chauffeurId, toast]);
 
-    // Initialisation et Realtime updates
     useEffect(() => {
         fetchJournee();
-
-        // Écoute les changements dans la table de journée pour ce chauffeur
         const channel = supabase
             .channel("journee_realtime")
             .on(
@@ -315,7 +290,7 @@ export default function ChauffeurDashboardBaticom({ session }) {
                 { event: "*", schema: "public", table: "journee_baticom" },
                 (payload) => {
                     if (payload.new?.chauffeur_id === chauffeurId || payload.old?.chauffeur_id === chauffeurId) {
-                         fetchJournee();
+                        fetchJournee();
                     }
                 }
             );
@@ -326,14 +301,12 @@ export default function ChauffeurDashboardBaticom({ session }) {
         });
 
         return () => {
-            // Nettoyage de la connexion Realtime
             if (channel && typeof supabase.removeChannel === "function") {
                 supabase.removeChannel(channel);
             }
         };
     }, [chauffeurId, fetchJournee]);
 
-    // Fonctions d'action
     const handleSignOut = async () => {
         setLoading(true);
         await supabase.auth.signOut();
@@ -354,22 +327,6 @@ export default function ChauffeurDashboardBaticom({ session }) {
         }
     };
 
-    const handleCloseDay = async () => {
-        if (!journee) return;
-        setLoading(true);
-        const { error } = await supabase
-            .from("journee_baticom")
-            .update({ statut: "clôturée", heure_cloture: new Date().toISOString() })
-            .eq("id", journee.id);
-        setLoading(false);
-        if (error) toast({ title: "❌ Erreur", description: error.message, variant: "destructive" });
-        else {
-            fetchJournee();
-            toast({ title: "✅ Journée clôturée", description: "L'heure de clôture a été enregistrée." });
-        }
-    };
-
-    // Affichage du loader global
     if (loading)
         return (
             <div className="flex items-center justify-center min-h-screen bg-gray-100 dark:bg-gray-900 transition-colors">
@@ -377,7 +334,6 @@ export default function ChauffeurDashboardBaticom({ session }) {
             </div>
         );
 
-    // Rendu Principal
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors">
             <DashboardHeader
@@ -391,29 +347,25 @@ export default function ChauffeurDashboardBaticom({ session }) {
             />
 
             <main className="px-4 pt-24 pb-20 space-y-6">
-                {/* --- Tab: Tableau de bord (Accueil) --- */}
                 {activeTab === "dashboard" && (
                     <DashboardContent
                         journee={journee}
                         voyages={voyages}
                         handleStartDay={handleStartDay}
-                        handleCloseDay={handleCloseDay}
                         setPanneDialog={setPanneDialog}
                     />
                 )}
 
-                {/* --- Tab: Historique des Journées (Nouveau) --- */}
                 {activeTab === "historique" && (
                     <div className="py-2">
-                         {chauffeurId ? (
-                             <HistoriqueJourneeChauffeur chauffeurId={chauffeurId} />
-                         ) : (
-                             <p className="text-center text-gray-500 pt-10">ID de chauffeur non disponible. Veuillez vous reconnecter.</p>
-                         )}
+                        {chauffeurId ? (
+                            <HistoriqueJourneeChauffeur chauffeurId={chauffeurId} />
+                        ) : (
+                            <p className="text-center text-gray-500 pt-10">ID de chauffeur non disponible. Veuillez vous reconnecter.</p>
+                        )}
                     </div>
                 )}
 
-                {/* --- Tab: Trajet (Placeholder) --- */}
                 {activeTab === "trajet" && (
                     <div className="p-6 text-center bg-white dark:bg-gray-800 rounded-lg shadow-md">
                         <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100 mb-2">Gestion des Trajets</h2>
@@ -421,7 +373,6 @@ export default function ChauffeurDashboardBaticom({ session }) {
                     </div>
                 )}
 
-                {/* --- Tab: Véhicule (Placeholder) --- */}
                 {activeTab === "vehicule" && (
                     <div className="p-6 text-center bg-white dark:bg-gray-800 rounded-lg shadow-md">
                         <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100 mb-2">Informations Véhicule</h2>
@@ -432,14 +383,13 @@ export default function ChauffeurDashboardBaticom({ session }) {
 
             <BottomNavigation activeTab={activeTab} setActiveTab={setActiveTab} />
 
-            {/* Modal de déclaration de panne : CORRECTION APPLIQUÉE ICI 👇 */}
             {panneDialog && (
                 <DeclarePanneModal 
                     open={panneDialog} 
                     onClose={() => setPanneDialog(false)} 
-                    chauffeurId={chauffeurId} // L'ID du chauffeur est envoyé
-                    missionId={journee?.id || null} // L'ID de la journée en cours est envoyé comme missionId
-                    structure="baticom" // La structure est spécifiée
+                    chauffeurId={chauffeurId}
+                    missionId={journee?.id || null}
+                    structure="baticom"
                 />
             )}
         </div>

@@ -1,74 +1,43 @@
-import * as React from "react"
-import { cn } from "../../lib/utils.jsx"
+import * as React from "react";
+import { cn } from "../../lib/utils.jsx";
 
-// 1. Composant principal Select (c'est la balise <select>)
-function Select({ className, children, ...props }) {
+/**
+ * Ce composant reproduit fidèlement le comportement du Select de shadcn/ui,
+ * mais en utilisant un <select> natif sous le capot.
+ */
+
+export function Select({ value, onValueChange, children, className }) {
   return (
     <select
+      value={value}
+      onChange={(e) => onValueChange(e.target.value)}
       className={cn(
-        "h-10 w-full rounded-md border border-gray-300 bg-white/70 px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500",
+        "h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500",
         className
       )}
-      {...props}
     >
       {children}
     </select>
-  )
+  );
 }
 
-// 2. SelectTrigger : Alias pour une balise simple pour corriger l'import
-// Dans le cas d'une balise <select> simple, elle n'a pas de trigger séparé, 
-// mais nous l'exportons pour que CamionsSection.js compile.
-const SelectTrigger = React.forwardRef(({ className, children, ...props }, ref) => (
-  <div 
-    ref={ref} 
-    className={cn("flex items-center justify-between", className)}
-    {...props}
-  >
-    {children}
-  </div>
-))
-SelectTrigger.displayName = "SelectTrigger"
+export const SelectTrigger = ({ className, children }) => (
+  <div className={cn("hidden", className)}>{children}</div>
+);
 
+export const SelectValue = ({ placeholder }) => (
+  <option disabled value="">
+    {placeholder}
+  </option>
+);
 
-// 3. SelectValue : Alias d'un div simple pour le placeholder/valeur
-const SelectValue = React.forwardRef(({ className, ...props }, ref) => (
-  <div ref={ref} className={className} {...props} />
-))
-SelectValue.displayName = "SelectValue"
+export const SelectContent = ({ children }) => <>{children}</>;
 
-
-// 4. SelectContent : Alias pour un div simple (le conteneur des options)
-const SelectContent = React.forwardRef(({ className, children, ...props }, ref) => (
-  <div 
-    ref={ref} 
-    className={cn("p-1 z-50 bg-white border rounded-md shadow-lg", className)} 
-    {...props}
-  >
-    {children}
-  </div>
-))
-SelectContent.displayName = "SelectContent"
-
-
-// 5. SelectItem : Alias pour la balise <option> native
-const SelectItem = React.forwardRef(({ className, children, value, ...props }, ref) => (
-  <option 
-    ref={ref} 
-    className={cn("px-2 py-1 text-sm hover:bg-gray-100 cursor-pointer", className)} 
-    value={value} // Très important : utiliser 'value' pour l'option
-    {...props}
+export const SelectItem = ({ value, children, className }) => (
+  <option
+    value={value}
+    className={cn("px-2 py-1 text-sm hover:bg-gray-100 cursor-pointer", className)}
   >
     {children}
   </option>
-))
-SelectItem.displayName = "SelectItem"
-
-
-export { 
-    Select, 
-    SelectTrigger, 
-    SelectValue,
-    SelectContent,
-    SelectItem 
-}
+);

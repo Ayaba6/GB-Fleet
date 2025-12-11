@@ -14,7 +14,9 @@ const ITEMS_PER_PAGE = 10;
 const STRUCTURE = "BATICOM";
 const STATUS_CLOSED = "clôturée";
 
-// Card Journee (Reste inchangée)
+// ----------------------------
+// CARD JOURNÉE (CORRIGÉ)
+// ----------------------------
 const CardJournee = ({ journee, chauffeur, camion, onEdit, onClose, onView }) => {
   const isClosed = journee.statut === STATUS_CLOSED;
   const isInProgress = journee.statut === "en cours";
@@ -67,18 +69,20 @@ const CardJournee = ({ journee, chauffeur, camion, onEdit, onClose, onView }) =>
           </Button>
         ) : (
           <>
+            {/* FIX #1 — Modifier */}
             <Button
               size="sm"
               className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-1"
-              onClick={() => setEditJournee(journee)}
+              onClick={() => onEdit(journee)}
             >
               <Pencil size={14} /> Modif.
             </Button>
 
+            {/* FIX #2 — Clôturer */}
             <Button
               size="sm"
               className="bg-red-600 hover:bg-red-700 text-white flex items-center gap-1"
-              onClick={() => handleConfirmClose(journee.id)}
+              onClick={() => onClose(journee.id)}
             >
               <Lock size={14} /> Clôturer
             </Button>
@@ -89,7 +93,9 @@ const CardJournee = ({ journee, chauffeur, camion, onEdit, onClose, onView }) =>
   );
 };
 
-// Main Section
+// ----------------------------
+// MAIN COMPONENT
+// ----------------------------
 export default function MissionsSectionBaticom() {
   const [showModal, setShowModal] = useState(false);
   const [editJournee, setEditJournee] = useState(null);
@@ -103,8 +109,6 @@ export default function MissionsSectionBaticom() {
   const [selectedJourneeId, setSelectedJourneeId] = useState(null);
   const [sortOrder, setSortOrder] = useState("desc");
   const [isLoading, setIsLoading] = useState(true);
-
-  // ... (fetchChauffeurs, fetchCamions, fetchJournees, handleCloseJournee, handleConfirmClose, confirmClose, useMemo remain unchanged) ...
 
   const fetchChauffeurs = useCallback(async () => {
     const { data } = await supabase
@@ -184,8 +188,7 @@ export default function MissionsSectionBaticom() {
   }, [journees, chauffeurs, camions, searchTerm, sortOrder, currentPage]);
 
   return (
-    // MODIFICATION CLÉ : Retrait de la classe "container"
-    <div className="p-3 sm:p-6 space-y-6 animate-fadeInUp"> 
+    <div className="p-3 sm:p-6 space-y-6 animate-fadeInUp">
       
       {/* Header */}
       <Card className="shadow-lg bg-white/80 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 backdrop-blur-sm">
@@ -217,7 +220,7 @@ export default function MissionsSectionBaticom() {
         {isLoading && <Loader2 className="animate-spin text-blue-500" size={24} />}
       </div>
 
-      {/* Liste des cards (la grille reste la même : grid-cols-1 sm:grid-cols-2 lg:grid-cols-3) */}
+      {/* Liste des cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {isLoading
           ? Array.from({ length: ITEMS_PER_PAGE }).map((_, i) => (
