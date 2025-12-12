@@ -16,7 +16,7 @@ import NewMissionModalGTS from "../components/modals/NewMissionModalGTS.jsx";
 import HistoriqueGTS from "../components/HistoriqueGTS.jsx";
 import DeclarePanneModal from "../components/modals/DeclarePanneModal.jsx";
 
-// --- Composant utilitaire pour le formatage des dates/heures ---
+// --- Utilitaire pour formatage des dates/heures ---
 const formatDateTime = (isoDate, timeOnly = false) => {
   if (!isoDate) return "N/A";
   const date = new Date(isoDate);
@@ -26,13 +26,8 @@ const formatDateTime = (isoDate, timeOnly = false) => {
 
 // --- Header fixe ---
 const DashboardHeaderGTS = ({
-  session,
-  darkMode,
-  setDarkMode,
-  handleSignOut,
-  openProfileMenu,
-  setOpenProfileMenu,
-  profileMenuRef,
+  session, darkMode, setDarkMode, handleSignOut,
+  openProfileMenu, setOpenProfileMenu, profileMenuRef,
 }) => {
   const userName = session?.user?.email?.split("@")[0] || "Chauffeur";
 
@@ -62,8 +57,7 @@ const DashboardHeaderGTS = ({
       </div>
 
       <h1 className="text-lg font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
-        <Route size={20} className="text-purple-600" />
-        GTS Dashboard
+        <Route size={20} className="text-purple-600" /> GTS Dashboard
       </h1>
 
       <button
@@ -101,8 +95,7 @@ const BottomNavigationGTS = ({ activeTab, setActiveTab }) => {
                 : "text-gray-500 dark:text-gray-400 font-medium hover:text-blue-500 dark:hover:text-blue-300"
             }`}
           >
-            <Icon size={22} />
-            {item.label}
+            <Icon size={22} />{item.label}
           </button>
         );
       })}
@@ -112,30 +105,32 @@ const BottomNavigationGTS = ({ activeTab, setActiveTab }) => {
 
 // --- Dashboard Content (Mission Active) ---
 const DashboardContentGTS = ({
-  activeMission,
-  handleNavigation,
-  handleSignalEntry,
-  handleSignalReturn,
-  setShowIncidentModal,
-  setShowNewMissionModal,
-  setPanneDialog,
+  activeMission, handleNavigation, handleSignalEntry,
+  setShowIncidentModal, setShowNewMissionModal, setPanneDialog,
   handleStartMission,
 }) => {
   const statutMission = activeMission?.statut || "N/A";
-  const enteredLome = !!activeMission?.entered_lome_at;
-  const isReadyForReturn = statutMission === "En Chargement" && enteredLome;
 
   let statusBadge;
-  if (statutMission === "Terminée")
-    statusBadge = <span className="px-3 py-1 text-sm font-semibold rounded-full bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300">Terminée</span>;
-  else if (statutMission === "En Cours")
-    statusBadge = <span className="px-3 py-1 text-sm font-semibold rounded-full bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300">En Cours</span>;
-  else if (statutMission === "Affectée")
-    statusBadge = <span className="px-3 py-1 text-sm font-semibold rounded-full bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300">Affectée</span>;
-  else if (statutMission === "En Chargement")
-    statusBadge = <span className="px-3 py-1 text-sm font-semibold rounded-full bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300">En Chargement</span>;
-  else
-    statusBadge = <span className="px-3 py-1 text-sm font-semibold rounded-full bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300">Disponible</span>;
+  switch (statutMission) {
+    case "Terminée":
+      statusBadge = <span className="px-3 py-1 text-sm font-semibold rounded-full bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300">Terminée</span>;
+      break;
+    case "En Cours":
+      statusBadge = <span className="px-3 py-1 text-sm font-semibold rounded-full bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300">En Cours</span>;
+      break;
+    case "Affectée":
+      statusBadge = <span className="px-3 py-1 text-sm font-semibold rounded-full bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300">Affectée</span>;
+      break;
+    case "En Chargement":
+      statusBadge = <span className="px-3 py-1 text-sm font-semibold rounded-full bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300">En Chargement</span>;
+      break;
+    case "En Déchargement":
+      statusBadge = <span className="px-3 py-1 text-sm font-semibold rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300">En Déchargement</span>;
+      break;
+    default:
+      statusBadge = <span className="px-3 py-1 text-sm font-semibold rounded-full bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300">Disponible</span>;
+  }
 
   const DetailItem = ({ icon: Icon, label, value, type = "text" }) => (
     <div className="flex items-center justify-between py-2 border-b dark:border-gray-700 last:border-b-0">
@@ -180,7 +175,7 @@ const DashboardContentGTS = ({
           <DetailItem icon={Route} label="Destination" value={activeMission.destination || "Lomé"} />
           <DetailItem icon={Clock} label="Début réel" value={formatDateTime(activeMission.started_at, true)} />
           {activeMission.tonnage > 0 && <DetailItem icon={Scale} label="Tonnage Prévu" value={`${activeMission.tonnage} t`} type="important" />}
-          {(activeMission.tonnage_charge > 0 || statutMission === "En Chargement") && (
+          {(activeMission.tonnage_charge > 0 || ["En Chargement", "En Déchargement"].includes(statutMission)) && (
             <DetailItem icon={Scale} label="Tonnage Chargé" value={activeMission.tonnage_charge > 0 ? `${activeMission.tonnage_charge} t` : "En attente"} />
           )}
         </div>
@@ -193,29 +188,21 @@ const DashboardContentGTS = ({
           )}
 
           {statutMission === "En Cours" && (
-            <>
-              <Button onClick={() => handleNavigation(activeMission)} className="w-full bg-green-600 hover:bg-green-700 text-white h-10 shadow-lg">
-                <Map size={20} className="mr-2" /> Démarrer Navigation GPS
-              </Button>
-
-              <Button onClick={() => handleSignalEntry(activeMission)} variant="outline" className="w-full border-orange-500 text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/30">
-                🚛 Signal entrée destination / Début Chargement
-              </Button>
-            </>
+            <Button onClick={() => handleSignalEntry(activeMission)} className="w-full bg-orange-500 hover:bg-orange-600 text-white h-10 shadow-lg">
+              🚛 Entrée à Lomé / Début Chargement
+            </Button>
           )}
 
           {statutMission === "En Chargement" && (
-            <>
-              <p className="text-center text-sm text-gray-500 dark:text-gray-400 font-semibold pt-1">
-                En attente de la saisie du rapport de chargement par l'administrateur.
-              </p>
+            <Button onClick={() => handleSignalEntry(activeMission)} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white h-10 shadow-lg">
+              🚛 Retour à Ouaga / Début Déchargement
+            </Button>
+          )}
 
-              {isReadyForReturn && (
-                <Button onClick={() => handleSignalReturn(activeMission)} variant="outline" className="w-full border-teal-500 text-teal-600 hover:bg-teal-50 dark:hover:bg-teal-900/30 mt-3">
-                  🏁 Signal retour à Ouaga / Clôture Mission
-                </Button>
-              )}
-            </>
+          {statutMission === "En Déchargement" && (
+            <p className="text-center text-sm text-gray-500 dark:text-gray-400 font-semibold pt-1">
+              En attente de la clôture par l'administrateur.
+            </p>
           )}
 
           {statutMission !== "Terminée" && (
@@ -251,16 +238,9 @@ export default function ChauffeurDashboardGTS({ session }) {
   const [openProfileMenu, setOpenProfileMenu] = useState(false);
   const profileMenuRef = useRef();
 
+  useEffect(() => { document.documentElement.classList.toggle("dark", darkMode); }, [darkMode]);
   useEffect(() => {
-    document.documentElement.classList.toggle("dark", darkMode);
-  }, [darkMode]);
-
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (profileMenuRef.current && !profileMenuRef.current.contains(event.target)) {
-        setOpenProfileMenu(false);
-      }
-    };
+    const handleClickOutside = (event) => { if (profileMenuRef.current && !profileMenuRef.current.contains(event.target)) setOpenProfileMenu(false); };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
@@ -273,7 +253,7 @@ export default function ChauffeurDashboardGTS({ session }) {
         .from("missions_gts")
         .select("*")
         .eq("chauffeur_id", chauffeurId)
-        .in("statut", ["Affectée", "En Cours", "En Chargement"])
+        .in("statut", ["Affectée", "En Cours", "En Chargement", "En Déchargement"])
         .order("date", { ascending: true });
 
       if (error) throw error;
@@ -281,94 +261,91 @@ export default function ChauffeurDashboardGTS({ session }) {
       const currentActive =
         missionsData.find((m) => m.statut === "En Cours") ||
         missionsData.find((m) => m.statut === "En Chargement") ||
+        missionsData.find((m) => m.statut === "En Déchargement") ||
         missionsData.find((m) => m.statut === "Affectée");
 
       setActiveMission(currentActive || null);
-
-      if (currentActive && currentActive.statut === "Affectée") {
-        setShowNewMissionModal(true);
-      } else {
-        setShowNewMissionModal(false);
-      }
+      setShowNewMissionModal(currentActive?.statut === "Affectée");
     } catch (err) {
       toast({ title: "Erreur de chargement", description: err.message, variant: "destructive" });
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   }, [chauffeurId, navigate, toast]);
 
   useEffect(() => {
     fetchMissions();
-
     const channel = supabase
       .channel(`missions_gts_chauffeur_${chauffeurId}`)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "missions_gts", filter: `chauffeur_id=eq.${chauffeurId}` },
-        () => fetchMissions()
-      )
+      .on("postgres_changes", { event: "*", schema: "public", table: "missions_gts", filter: `chauffeur_id=eq.${chauffeurId}` }, () => fetchMissions())
       .subscribe();
-
-    return () => {
-      if (channel) supabase.removeChannel(channel);
-    };
+    return () => { if (channel) supabase.removeChannel(channel); };
   }, [chauffeurId, fetchMissions]);
 
-  // --- Déconnexion corrigée ---
+  // --- Déconnexion corrigée (utilise scope local pour éviter 403 global) ---
   const handleSignOut = async () => {
     try {
-      const { error } = await supabase.auth.signOut();
+      // Essayer avec scope local (évite le problème 403 quand global est bloqué)
+      const { error } = await supabase.auth.signOut({ scope: "local" });
       if (error) throw error;
       navigate("/login");
     } catch (err) {
-      toast({
-        title: "Erreur déconnexion",
-        description: err.message,
-        variant: "destructive"
-      });
+      // Fallback : appeler signOut sans option si scope local échoue
+      try {
+        const { error: e2 } = await supabase.auth.signOut();
+        if (e2) throw e2;
+        navigate("/login");
+      } catch (err2) {
+        toast({ title: "Erreur déconnexion", description: (err2?.message || err.message), variant: "destructive" });
+      }
     }
   };
 
   const handleNavigation = (mission) => {
-    const destination = mission.destination || "destination";
-    const url = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destination)}`;
+    const url = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(mission.destination || "destination")}`;
     window.open(url, "_blank");
   };
 
+  // handleSignalEntry : gère 2 transitions côté chauffeur :
+  // - En Cours -> En Chargement (entered_lome_at)
+  // - En Chargement -> En Déchargement (returned_ouaga_at)  -- admin clôturera plus tard
   const handleSignalEntry = async (mission) => {
     setLoading(true);
-    const { error } = await supabase.from("missions_gts").update({
-      statut: "En Chargement",
-      entered_lome_at: new Date().toISOString()
-    }).eq("id", mission.id);
-    if (!error) toast({ title: "✅ Entrée signalée", description: "Statut mis à jour à 'En Chargement'." });
-    else toast({ title: "❌ Erreur", description: error.message, variant: "destructive" });
-    fetchMissions();
-  };
+    try {
+      let newStatut = null;
+      const now = new Date().toISOString();
 
-  const handleSignalReturn = async (mission) => {
-    setLoading(true);
-    const { error } = await supabase.from("missions_gts").update({
-      statut: "Terminée",
-      returned_ouaga_at: new Date().toISOString()
-    }).eq("id", mission.id);
-    if (!error) toast({ title: "✅ Retour signalé", description: "Mission clôturée." });
-    else toast({ title: "❌ Erreur", description: error.message, variant: "destructive" });
-    fetchMissions();
+      if (mission.statut === "En Cours") newStatut = "En Chargement";
+      else if (mission.statut === "En Chargement") newStatut = "En Déchargement";
+
+      if (!newStatut) {
+        // Rien à faire (ex : déjà en déchargement/terminée)
+        setLoading(false);
+        return;
+      }
+
+      const updates = { statut: newStatut };
+      if (newStatut === "En Chargement") updates.entered_lome_at = now;
+      // IMPORTANT: la colonne dans la table est `returned_ouaga_at` (retour à Ouaga)
+      if (newStatut === "En Déchargement") updates.returned_ouaga_at = now;
+
+      const { error } = await supabase.from("missions_gts").update(updates).eq("id", mission.id);
+      if (error) throw error;
+
+      toast({ title: "✅ Statut mis à jour", description: `Mission passée à "${newStatut}".` });
+      await fetchMissions();
+    } catch (err) {
+      toast({ title: "❌ Erreur", description: err.message, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleStartMission = async (mission) => {
     try {
       setLoading(true);
-      const { error } = await supabase
-        .from("missions_gts")
-        .update({ statut: "En Cours", started_at: new Date().toISOString() })
-        .eq("id", mission.id);
-
+      const { error } = await supabase.from("missions_gts").update({ statut: "En Cours", started_at: new Date().toISOString() }).eq("id", mission.id);
       if (error) throw error;
-
       toast({ title: "Mission démarrée", description: "Le statut a été mis à jour à 'En Cours'." });
-      fetchMissions();
+      await fetchMissions();
     } catch (err) {
       toast({ title: "Erreur", description: err.message, variant: "destructive" });
     } finally {
@@ -376,80 +353,32 @@ export default function ChauffeurDashboardGTS({ session }) {
     }
   };
 
-  if (loading)
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-100 dark:bg-gray-900 transition-colors">
-        <Loader2 className="animate-spin w-12 h-12 text-purple-600 dark:text-purple-400" />
-      </div>
-    );
+  if (loading) return (
+    <div className="flex items-center justify-center min-h-screen bg-gray-100 dark:bg-gray-900 transition-colors">
+      <Loader2 className="animate-spin w-12 h-12 text-purple-600 dark:text-purple-400" />
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors">
-      <DashboardHeaderGTS
-        session={session}
-        darkMode={darkMode}
-        setDarkMode={setDarkMode}
-        handleSignOut={handleSignOut}
-        openProfileMenu={openProfileMenu}
-        setOpenProfileMenu={setOpenProfileMenu}
-        profileMenuRef={profileMenuRef}
-      />
+      <DashboardHeaderGTS session={session} darkMode={darkMode} setDarkMode={setDarkMode} handleSignOut={handleSignOut} openProfileMenu={openProfileMenu} setOpenProfileMenu={setOpenProfileMenu} profileMenuRef={profileMenuRef} />
 
       <main className="px-4 pt-24 pb-20 space-y-6">
-        {activeTab === "dashboard" && (
-          <DashboardContentGTS
-            activeMission={activeMission}
-            handleNavigation={handleNavigation}
-            handleSignalEntry={handleSignalEntry}
-            handleSignalReturn={handleSignalReturn}
-            setShowIncidentModal={setShowIncidentModal}
-            setShowNewMissionModal={setShowNewMissionModal}
-            setPanneDialog={setPanneDialog}
-            handleStartMission={handleStartMission}
-          />
-        )}
+        {activeTab === "dashboard" && <DashboardContentGTS activeMission={activeMission} handleNavigation={handleNavigation} handleSignalEntry={handleSignalEntry} setShowIncidentModal={setShowIncidentModal} setShowNewMissionModal={setShowNewMissionModal} setPanneDialog={setPanneDialog} handleStartMission={handleStartMission} />}
 
-        {activeTab === "historique" && (
-          <div className="py-2">
-            {chauffeurId ? (
-              <HistoriqueGTS chauffeurId={chauffeurId} structure="gts" />
-            ) : (
-              <p className="text-center text-gray-500 pt-10">
-                ID de chauffeur non disponible. Veuillez vous reconnecter.
-              </p>
-            )}
-          </div>
-        )}
+        {activeTab === "historique" && <div className="py-2">{chauffeurId ? <HistoriqueGTS chauffeurId={chauffeurId} structure="gts" /> : <p className="text-center text-gray-500 pt-10">ID de chauffeur non disponible. Veuillez vous reconnecter.</p>}</div>}
 
-        {activeTab === "messages" && (
-          <div className="p-6 text-center bg-white dark:bg-gray-800 rounded-lg shadow-md">
-            <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100 mb-2">Centre de Messages</h2>
-            <p className="text-gray-700 dark:text-gray-200">Bientôt disponible : Chat direct avec le superviseur GTS.</p>
-          </div>
-        )}
+        {activeTab === "messages" && <div className="p-6 text-center bg-white dark:bg-gray-800 rounded-lg shadow-md"><h2 className="text-xl font-bold text-gray-800 dark:text-gray-100 mb-2">Centre de Messages</h2><p className="text-gray-700 dark:text-gray-200">Bientôt disponible : Chat direct avec le superviseur GTS.</p></div>}
 
-        {activeTab === "vehicule" && (
-          <div className="p-6 text-center bg-white dark:bg-gray-800 rounded-lg shadow-md">
-            <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100 mb-2">Informations Véhicule</h2>
-            <p className="text-gray-700 dark:text-gray-200">Détails, documents et maintenance du véhicule...</p>
-          </div>
-        )}
+        {activeTab === "vehicule" && <div className="p-6 text-center bg-white dark:bg-gray-800 rounded-lg shadow-md"><h2 className="text-xl font-bold text-gray-800 dark:text-gray-100 mb-2">Informations Véhicule</h2><p className="text-gray-700 dark:text-gray-200">Détails, documents et maintenance du véhicule...</p></div>}
       </main>
 
       <BottomNavigationGTS activeTab={activeTab} setActiveTab={setActiveTab} />
 
       {/* Modals */}
-      {showNewMissionModal && activeMission?.statut === "Affectée" && (
-        <NewMissionModalGTS mission={activeMission} setShowModal={setShowNewMissionModal} fetchMissions={fetchMissions} />
-      )}
-
-      {showIncidentModal && activeMission && (
-        <IncidentModalGTS open={showIncidentModal} onClose={() => setShowIncidentModal(false)} chauffeurId={chauffeurId} missionId={activeMission.id} />
-      )}
-
-      {panneDialog && (
-        <DeclarePanneModal open={panneDialog} onClose={() => setPanneDialog(false)} chauffeurId={chauffeurId} missionId={activeMission?.id || null} structure="gts" />
-      )}
+      {showNewMissionModal && activeMission?.statut === "Affectée" && <NewMissionModalGTS mission={activeMission} setShowModal={setShowNewMissionModal} fetchMissions={fetchMissions} />}
+      {showIncidentModal && activeMission && <IncidentModalGTS open={showIncidentModal} onClose={() => setShowIncidentModal(false)} chauffeurId={chauffeurId} missionId={activeMission.id} />}
+      {panneDialog && <DeclarePanneModal open={panneDialog} onClose={() => setPanneDialog(false)} chauffeurId={chauffeurId} missionId={activeMission?.id || null} structure="gts" />}
     </div>
   );
 }
