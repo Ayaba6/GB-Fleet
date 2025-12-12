@@ -1,7 +1,7 @@
 import React from "react";
 import { 
   LogOut, X, GaugeCircle, Users, Truck, ClipboardList, 
-  Wrench, FileWarning, CreditCard, Menu 
+  AlertTriangle, FileWarning, CreditCard, Settings
 } from "lucide-react";
 
 const MENU_ITEMS = [
@@ -9,10 +9,13 @@ const MENU_ITEMS = [
   { key: "users", label: "Utilisateurs", icon: Users },
   { key: "camions", label: "Flotte", icon: Truck },
   { key: "missions", label: "Missions", icon: ClipboardList },
-  { key: "pannes", label: "Pannes", icon: Wrench },
+  { key: "pannes", label: "Pannes", icon: AlertTriangle },
+  { key: "maintenance", label: "Maintenance", icon: Settings },
   { key: "documents", label: "Documents", icon: FileWarning },
   { key: "billing", label: "Facturation", icon: CreditCard },
 ];
+
+// ... reste du code inchangé
 
 export default function AdminSidebar({
   user,
@@ -39,18 +42,10 @@ export default function AdminSidebar({
           transform transition-transform duration-300
           ${menuOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}
       >
-        
-        {/* Barre mobile avec bouton fermer (Style semi-transparent appliqué) */}
+        {/* Barre mobile avec bouton fermer */}
         <div className="flex justify-end px-4 py-4 border-b border-gray-200 dark:border-gray-700 md:hidden">
           <button
-            className={`
-              p-2 rounded-lg 
-              // Style semi-transparent et flou
-              bg-white/70 dark:bg-gray-800/70 
-              backdrop-blur-sm shadow-sm
-              hover:bg-gray-200 dark:hover:bg-gray-700
-              transition-colors
-            `}
+            className="p-2 rounded-lg bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm shadow-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
             onClick={() => setMenuOpen(false)}
           >
             <X className="w-6 h-6 text-gray-800 dark:text-gray-200" />
@@ -103,8 +98,7 @@ export default function AdminSidebar({
         <div className="absolute bottom-0 left-0 w-full p-4 border-t border-gray-200 dark:border-gray-700">
           <button
             onClick={handleLogout}
-            className="w-full flex items-center justify-center gap-2 py-3 rounded-xl
-              bg-red-600 text-white font-semibold hover:bg-red-700 transition-all"
+            className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-red-600 text-white font-semibold hover:bg-red-700 transition-all"
           >
             <LogOut className="w-5 h-5" />
             Déconnexion
