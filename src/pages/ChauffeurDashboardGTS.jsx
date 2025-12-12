@@ -7,7 +7,7 @@ import { Button } from "../components/ui/button.jsx";
 import { useToast } from "../components/ui/use-toast.jsx";
 import {
   LogOut, Moon, Sun, Loader2, User, Home, History, Truck, Clock, Calendar,
-  MessageSquare, Wrench, AlertTriangle, Route, CheckCircle, Scale, Map
+  MessageSquare, Wrench, Route, CheckCircle, Scale, Map
 } from "lucide-react";
 
 // Imports des composants spécifiques GTS
@@ -122,41 +122,20 @@ const DashboardContentGTS = ({
   handleStartMission,
 }) => {
   const statutMission = activeMission?.statut || "N/A";
-  const missionStarted = !!activeMission?.started_at;
   const enteredLome = !!activeMission?.entered_lome_at;
   const isReadyForReturn = statutMission === "En Chargement" && enteredLome;
 
   let statusBadge;
   if (statutMission === "Terminée")
-    statusBadge = (
-      <span className="px-3 py-1 text-sm font-semibold rounded-full bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300">
-        Terminée
-      </span>
-    );
+    statusBadge = <span className="px-3 py-1 text-sm font-semibold rounded-full bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300">Terminée</span>;
   else if (statutMission === "En Cours")
-    statusBadge = (
-      <span className="px-3 py-1 text-sm font-semibold rounded-full bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300">
-        En Cours
-      </span>
-    );
+    statusBadge = <span className="px-3 py-1 text-sm font-semibold rounded-full bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300">En Cours</span>;
   else if (statutMission === "Affectée")
-    statusBadge = (
-      <span className="px-3 py-1 text-sm font-semibold rounded-full bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300">
-        Affectée
-      </span>
-    );
+    statusBadge = <span className="px-3 py-1 text-sm font-semibold rounded-full bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300">Affectée</span>;
   else if (statutMission === "En Chargement")
-    statusBadge = (
-      <span className="px-3 py-1 text-sm font-semibold rounded-full bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300">
-        En Chargement
-      </span>
-    );
+    statusBadge = <span className="px-3 py-1 text-sm font-semibold rounded-full bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300">En Chargement</span>;
   else
-    statusBadge = (
-      <span className="px-3 py-1 text-sm font-semibold rounded-full bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300">
-        Disponible
-      </span>
-    );
+    statusBadge = <span className="px-3 py-1 text-sm font-semibold rounded-full bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300">Disponible</span>;
 
   const DetailItem = ({ icon: Icon, label, value, type = "text" }) => (
     <div className="flex items-center justify-between py-2 border-b dark:border-gray-700 last:border-b-0">
@@ -164,13 +143,7 @@ const DashboardContentGTS = ({
         <Icon size={18} className="text-purple-500 dark:text-purple-400" />
         <span className="font-medium">{label}</span>
       </div>
-      <span
-        className={`font-semibold ${
-          type === "important"
-            ? "text-lg text-blue-600 dark:text-blue-400"
-            : "text-gray-800 dark:text-gray-100"
-        }`}
-      >
+      <span className={`font-semibold ${type === "important" ? "text-lg text-blue-600 dark:text-blue-400" : "text-gray-800 dark:text-gray-100"}`}>
         {value}
       </span>
     </div>
@@ -180,17 +153,10 @@ const DashboardContentGTS = ({
     return (
       <Card className="p-6 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-lg text-center">
         <Truck size={32} className="mx-auto mb-4 text-green-500" />
-        <p className="text-gray-700 dark:text-gray-200 text-lg font-semibold">
-          Aucune mission en cours ou affectée.
-        </p>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
-          Vous êtes actuellement disponible pour une nouvelle affectation.
-        </p>
+        <p className="text-gray-700 dark:text-gray-200 text-lg font-semibold">Aucune mission en cours ou affectée.</p>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">Vous êtes actuellement disponible pour une nouvelle affectation.</p>
         <div className="pt-4 mt-4 border-t border-gray-200 dark:border-gray-700">
-          <Button
-            onClick={() => setPanneDialog(true)}
-            className="w-full h-10 flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white font-medium"
-          >
+          <Button onClick={() => setPanneDialog(true)} className="w-full h-10 flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white font-medium">
             <Wrench size={18} /> Déclarer une panne (Hors Mission)
           </Button>
         </div>
@@ -208,77 +174,31 @@ const DashboardContentGTS = ({
 
       <CardContent className="p-4 space-y-4">
         <div className="space-y-2">
-          <DetailItem
-            icon={Calendar}
-            label="Date Prévue"
-            value={formatDateTime(activeMission.date)}
-          />
-          <DetailItem
-            icon={Clock}
-            label="Titre"
-            value={activeMission.titre || "Mission GTS"}
-          />
-          <DetailItem
-            icon={Route}
-            label="Départ"
-            value={activeMission.depart || "Ouaga"}
-          />
-          <DetailItem
-            icon={Route}
-            label="Destination"
-            value={activeMission.destination || "Lomé"}
-          />
-          <DetailItem
-            icon={Clock}
-            label="Début réel"
-            value={formatDateTime(activeMission.started_at, true)}
-          />
-
-          {activeMission.tonnage > 0 && (
-            <DetailItem
-              icon={Scale}
-              label="Tonnage Prévu"
-              value={`${activeMission.tonnage} t`}
-              type="important"
-            />
-          )}
+          <DetailItem icon={Calendar} label="Date Prévue" value={formatDateTime(activeMission.date)} />
+          <DetailItem icon={Clock} label="Titre" value={activeMission.titre || "Mission GTS"} />
+          <DetailItem icon={Route} label="Départ" value={activeMission.depart || "Ouaga"} />
+          <DetailItem icon={Route} label="Destination" value={activeMission.destination || "Lomé"} />
+          <DetailItem icon={Clock} label="Début réel" value={formatDateTime(activeMission.started_at, true)} />
+          {activeMission.tonnage > 0 && <DetailItem icon={Scale} label="Tonnage Prévu" value={`${activeMission.tonnage} t`} type="important" />}
           {(activeMission.tonnage_charge > 0 || statutMission === "En Chargement") && (
-            <DetailItem
-              icon={Scale}
-              label="Tonnage Chargé"
-              value={
-                activeMission.tonnage_charge > 0
-                  ? `${activeMission.tonnage_charge} t`
-                  : "En attente"
-              }
-            />
+            <DetailItem icon={Scale} label="Tonnage Chargé" value={activeMission.tonnage_charge > 0 ? `${activeMission.tonnage_charge} t` : "En attente"} />
           )}
         </div>
 
         <div className="pt-4 border-t border-gray-200 dark:border-gray-700 space-y-3">
           {statutMission === "Affectée" && (
-            <Button
-              onClick={() => handleStartMission(activeMission)}
-              className="w-full bg-green-600 hover:bg-green-700 text-white text-lg font-semibold h-12 shadow-lg"
-            >
+            <Button onClick={() => handleStartMission(activeMission)} className="w-full bg-green-600 hover:bg-green-700 text-white text-lg font-semibold h-12 shadow-lg">
               <CheckCircle size={20} className="mr-2" /> Démarrer la Mission
             </Button>
           )}
 
           {statutMission === "En Cours" && (
             <>
-              <Button
-                onClick={() => handleNavigation(activeMission)}
-                className="w-full bg-green-600 hover:bg-green-700 text-white h-10 shadow-lg"
-              >
+              <Button onClick={() => handleNavigation(activeMission)} className="w-full bg-green-600 hover:bg-green-700 text-white h-10 shadow-lg">
                 <Map size={20} className="mr-2" /> Démarrer Navigation GPS
               </Button>
 
-              <Button
-                onClick={() => handleSignalEntry(activeMission)}
-                variant="outline"
-                className="w-full border-orange-500 text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/30"
-              >
+              <Button onClick={() => handleSignalEntry(activeMission)} variant="outline" className="w-full border-orange-500 text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/30">
                 🚛 Signal entrée destination / Début Chargement
               </Button>
             </>
@@ -291,11 +211,7 @@ const DashboardContentGTS = ({
               </p>
 
               {isReadyForReturn && (
-                <Button
-                  onClick={() => handleSignalReturn(activeMission)}
-                  variant="outline"
-                  className="w-full border-teal-500 text-teal-600 hover:bg-teal-50 dark:hover:bg-teal-900/30 mt-3"
-                >
+                <Button onClick={() => handleSignalReturn(activeMission)} variant="outline" className="w-full border-teal-500 text-teal-600 hover:bg-teal-50 dark:hover:bg-teal-900/30 mt-3">
                   🏁 Signal retour à Ouaga / Clôture Mission
                 </Button>
               )}
@@ -304,10 +220,7 @@ const DashboardContentGTS = ({
 
           {statutMission !== "Terminée" && (
             <div className="pt-3 border-t border-dashed border-gray-200 dark:border-gray-700">
-              <Button
-                onClick={() => setShowIncidentModal(true)}
-                className="w-full h-10 flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white font-medium"
-              >
+              <Button onClick={() => setShowIncidentModal(true)} className="w-full h-10 flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white font-medium">
                 <Wrench size={18} /> Déclarer panne/incident
               </Button>
             </div>
@@ -401,9 +314,19 @@ export default function ChauffeurDashboardGTS({ session }) {
     };
   }, [chauffeurId, fetchMissions]);
 
+  // --- Déconnexion corrigée ---
   const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    navigate("/login");
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      navigate("/login");
+    } catch (err) {
+      toast({
+        title: "Erreur déconnexion",
+        description: err.message,
+        variant: "destructive"
+      });
+    }
   };
 
   const handleNavigation = (mission) => {
@@ -517,30 +440,15 @@ export default function ChauffeurDashboardGTS({ session }) {
 
       {/* Modals */}
       {showNewMissionModal && activeMission?.statut === "Affectée" && (
-        <NewMissionModalGTS
-          mission={activeMission}
-          setShowModal={setShowNewMissionModal}
-          fetchMissions={fetchMissions}
-        />
+        <NewMissionModalGTS mission={activeMission} setShowModal={setShowNewMissionModal} fetchMissions={fetchMissions} />
       )}
 
       {showIncidentModal && activeMission && (
-        <IncidentModalGTS
-          open={showIncidentModal}
-          onClose={() => setShowIncidentModal(false)}
-          chauffeurId={chauffeurId}
-          missionId={activeMission.id}
-        />
+        <IncidentModalGTS open={showIncidentModal} onClose={() => setShowIncidentModal(false)} chauffeurId={chauffeurId} missionId={activeMission.id} />
       )}
 
       {panneDialog && (
-        <DeclarePanneModal
-          open={panneDialog}
-          onClose={() => setPanneDialog(false)}
-          chauffeurId={chauffeurId}
-          missionId={activeMission?.id || null}
-          structure="gts"
-        />
+        <DeclarePanneModal open={panneDialog} onClose={() => setPanneDialog(false)} chauffeurId={chauffeurId} missionId={activeMission?.id || null} structure="gts" />
       )}
     </div>
   );

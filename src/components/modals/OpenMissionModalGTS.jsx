@@ -4,23 +4,31 @@ import { useToast } from "../ui/use-toast.jsx";
 import { Loader2, X, Truck, User, Calendar, Briefcase } from "lucide-react";
 import { supabase } from "../../config/supabaseClient.js";
 
-// Style inputs corrigé (texte bien visible en mode clair)
 const BASE_INPUT_STYLE =
   "w-full border rounded-lg p-2.5 bg-white text-gray-800 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 focus:ring-indigo-500 focus:border-indigo-500 transition-colors";
 
-export default function OpenMissionModalGTS({ setShowModal, fetchMissions, chauffeurs = [], camions = [] }) {
+export default function OpenMissionModalGTS({
+  setShowModal,
+  fetchMissions,
+  chauffeurs = [],
+  camions = []
+}) {
   const { toast } = useToast();
   const [titre, setTitre] = useState("");
   const [chauffeurId, setChauffeurId] = useState("");
   const [camionId, setCamionId] = useState("");
   const [fraisMission, setFraisMission] = useState(0);
   const [fraisFuel, setFraisFuel] = useState(0);
-  const [dateDepart, setDateDepart] = useState(new Date().toISOString().split("T")[0]);
+  const [dateDepart, setDateDepart] = useState(
+    new Date().toISOString().split("T")[0]
+  );
   const [loading, setLoading] = useState(false);
   const [formError, setFormError] = useState(null);
 
-  const gtsCamions = camions.filter(c => c.structure === "GTS" && c.statut === "Disponible");
-  const gtsChauffeurs = chauffeurs.filter(c => c.structure === "GTS");
+  const gtsCamions = camions.filter(
+    (c) => c.structure === "GTS" && c.statut === "Disponible"
+  );
+  const gtsChauffeurs = chauffeurs.filter((c) => c.structure === "GTS");
 
   const handleCreate = async () => {
     setFormError(null);
@@ -30,6 +38,7 @@ export default function OpenMissionModalGTS({ setShowModal, fetchMissions, chauf
     }
 
     setLoading(true);
+
     try {
       const today = new Date().toISOString().split("T")[0];
 
@@ -39,30 +48,47 @@ export default function OpenMissionModalGTS({ setShowModal, fetchMissions, chauf
         camion_id: camionId,
         date_depart: dateDepart,
         date: today,
-        statut: "En cours",
+        statut: "Affectée", // ⬅️ ***CORRECTION CRITIQUE***
         structure: "GTS",
         frais_mission: Number(fraisMission) || 0,
         frais_fuel: Number(fraisFuel) || 0,
       };
 
-      const { error: insertError } = await supabase.from("missions_gts").insert([missionPayload]);
+      const { error: insertError } = await supabase
+        .from("missions_gts")
+        .insert([missionPayload]);
+
       if (insertError) throw insertError;
 
-      const { error: updateCamionError } = await supabase.from("camions").update({ statut: "En mission" }).eq("id", camionId);
+      // Mettre camion en mission
+      const { error: updateCamionError } = await supabase
+        .from("camions")
+        .update({ statut: "En mission" })
+        .eq("id", camionId);
+
       if (updateCamionError) {
         toast({
           title: "Alerte",
-          description: "Mission ouverte mais le statut du camion n'a pas été mis à jour.",
+          description:
+            "Mission créée mais le statut du camion n’a pas pu être mis à jour.",
           variant: "warning",
         });
       }
 
-      toast({ title: "🚀 Mission Démarrée", description: `La mission '${titre}' a été ouverte pour GTS.` });
+      toast({
+        title: "🎉 Mission Affectée",
+        description: `La mission '${titre}' a été créée et affectée au chauffeur.`,
+      });
+
       setShowModal(false);
       fetchMissions();
     } catch (error) {
       setFormError(error.message);
-      toast({ title: "❌ Erreur Critique", description: error.message, variant: "destructive" });
+      toast({
+        title: "❌ Erreur Critique",
+        description: error.message,
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
@@ -109,7 +135,6 @@ export default function OpenMissionModalGTS({ setShowModal, fetchMissions, chauf
               onChange={(e) => setTitre(e.target.value)}
               className={BASE_INPUT_STYLE}
               placeholder="Ex: Livraison ciment Tanger"
-              required
             />
           </div>
 
@@ -118,7 +143,11 @@ export default function OpenMissionModalGTS({ setShowModal, fetchMissions, chauf
             <label className="block font-medium text-gray-700 dark:text-gray-200 flex items-center gap-2">
               <User size={18} className="text-indigo-500" /> Chauffeur *
             </label>
-            <select value={chauffeurId} onChange={(e) => setChauffeurId(e.target.value)} className={BASE_INPUT_STYLE} required>
+            <select
+              value={chauffeurId}
+              onChange={(e) => setChauffeurId(e.target.value)}
+              className={BASE_INPUT_STYLE}
+            >
               <option value="">-- Sélectionner un chauffeur GTS --</option>
               {gtsChauffeurs.map((c) => (
                 <option key={c.id} value={c.id}>
@@ -133,7 +162,11 @@ export default function OpenMissionModalGTS({ setShowModal, fetchMissions, chauf
             <label className="block font-medium text-gray-700 dark:text-gray-200 flex items-center gap-2">
               <Truck size={18} className="text-indigo-500" /> Camion *
             </label>
-            <select value={camionId} onChange={(e) => setCamionId(e.target.value)} className={BASE_INPUT_STYLE} required>
+            <select
+              value={camionId}
+              onChange={(e) => setCamionId(e.target.value)}
+              className={BASE_INPUT_STYLE}
+            >
               <option value="">-- Sélectionner un camion GTS disponible --</option>
               {gtsCamions.map((c) => (
                 <option key={c.id} value={c.id}>
@@ -153,15 +186,14 @@ export default function OpenMissionModalGTS({ setShowModal, fetchMissions, chauf
               value={dateDepart}
               onChange={(e) => setDateDepart(e.target.value)}
               className={BASE_INPUT_STYLE}
-              required
             />
           </div>
 
           {/* Frais */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t dark:border-gray-700">
             <div className="space-y-1">
-              <label className="block font-medium text-gray-700 dark:text-gray-200 flex items-center gap-2">
-                <span className="font-semibold text-green-600">FCFA</span> Frais mission
+              <label className="block font-medium text-gray-700 dark:text-gray-200">
+                Frais mission (FCFA)
               </label>
               <input
                 type="number"
@@ -173,8 +205,8 @@ export default function OpenMissionModalGTS({ setShowModal, fetchMissions, chauf
             </div>
 
             <div className="space-y-1">
-              <label className="block font-medium text-gray-700 dark:text-gray-200 flex items-center gap-2">
-                <span className="font-semibold text-red-600">FCFA</span> Frais fuel
+              <label className="block font-medium text-gray-700 dark:text-gray-200">
+                Frais fuel (FCFA)
               </label>
               <input
                 type="number"
@@ -188,11 +220,11 @@ export default function OpenMissionModalGTS({ setShowModal, fetchMissions, chauf
         </div>
 
         <div className="flex justify-end gap-3 pt-4 border-t dark:border-gray-700">
-          <Button type="button" onClick={() => setShowModal(false)} variant="outline">
+          <Button onClick={() => setShowModal(false)} variant="outline">
             Annuler
           </Button>
 
-          <Button type="button" onClick={handleCreate} disabled={loading}>
+          <Button onClick={handleCreate} disabled={loading}>
             {loading ? (
               <span className="flex items-center gap-2">
                 <Loader2 className="animate-spin" size={16} /> Enregistrement...
