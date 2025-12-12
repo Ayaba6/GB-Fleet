@@ -252,7 +252,7 @@ export default function UsersSection() {
           <option value="GTS">GTS</option>
         </select>
 
-        <div className="flex gap-2">
+        <div className="flex flex-col gap-2">
           <Button
             onClick={exportExcel}
             variant="outline"
@@ -306,7 +306,8 @@ export default function UsersSection() {
                   </p>
                 </div>
 
-                <div className="flex gap-2">
+                {/* Boutons verticalisés */}
+                <div className="flex flex-col gap-2 items-center ml-2">
                   <Button
                     variant="outline"
                     size="icon"
