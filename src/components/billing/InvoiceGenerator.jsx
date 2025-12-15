@@ -117,7 +117,7 @@ export function generateInvoicePDF(invoiceData) {
 
     autoTable(doc, {
       startY: infoY,
-      head: [["Libellé", "Montant (XOF)"]],
+      head: [["Libellé", "Montant (FCFA)"]],
       body: invoiceData.summaryData.map(row => [
         row.label,
         formatNumberWithSpace(Number(row.amount))
@@ -127,11 +127,11 @@ export function generateInvoicePDF(invoiceData) {
       styles: { fontSize: 10 },
       columnStyles: { 
         0: { cellWidth: 120 },
-        1: { cellWidth: 60, halign: "center", valign: "middle" } // CENTRAGE montant
+        1: { cellWidth: 60, halign: "right", valign: "middle" }
       },
     });
 
-    const totalRow = invoiceData.summaryData.find(r => r.label?.toLowerCase().includes("total"));
+    const totalRow = invoiceData.summaryData.find(r => r.label === "TOTAL HTVA");
     if (totalRow) resumeTotal = Number(totalRow.amount) || 0;
 
     infoY = doc.lastAutoTable.finalY + 10;
@@ -146,7 +146,7 @@ export function generateInvoicePDF(invoiceData) {
 
     autoTable(doc, {
       startY: infoY,
-      head: [["Description", "Prix Unitaire (XOF)", "Quantité", "Total (XOF)"]],
+      head: [["Description", "Prix Unitaire (FCFA)", "Quantité", "Total (FCFA)"]],
       body: invoiceData.itemsData.map(row => [
         row.description,
         formatNumberWithSpace(Number(row.unitPrice)),
@@ -158,16 +158,16 @@ export function generateInvoicePDF(invoiceData) {
       styles: { fontSize: 10 },
       columnStyles: {
         0: { cellWidth: 80 },
-        1: { cellWidth: 40, halign: "center", valign: "middle" },
-        2: { cellWidth: 30, halign: "center", valign: "middle" },
-        3: { cellWidth: 40, halign: "center", valign: "middle" },
+        1: { cellWidth: 40, halign: "right", valign: "middle" },
+        2: { cellWidth: 30, halign: "right", valign: "middle" },
+        3: { cellWidth: 40, halign: "right", valign: "middle" },
       },
     });
 
     infoY = doc.lastAutoTable.finalY + 10;
   }
 
-  // --- Texte final ---
+  // --- Texte final HTVA ---
   if (resumeTotal > 0) {
     const totalInWords = convertNumberToWords(resumeTotal);
 
