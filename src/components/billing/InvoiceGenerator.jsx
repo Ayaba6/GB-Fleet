@@ -104,7 +104,13 @@ export function generateInvoicePDF(invoiceData) {
   infoY += 5;
   doc.text(`Objet: ${invoiceData.objet}`, 14, infoY);
   infoY += 5;
-  doc.text(`Période: ${invoiceData.periode}`, 14, infoY);
+
+  // 🔹 Période : deux dates
+  if (invoiceData.periodeDebut && invoiceData.periodeFin) {
+    doc.text(`Période: du ${invoiceData.periodeDebut} au ${invoiceData.periodeFin}`, 14, infoY);
+  } else {
+    doc.text(`Période: ${invoiceData.periode || ""}`, 14, infoY);
+  }
   infoY += 10;
 
   // --- Tableau Résumé ---

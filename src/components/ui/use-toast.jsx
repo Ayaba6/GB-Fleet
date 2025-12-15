@@ -9,8 +9,11 @@ export function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([]);
 
   const toast = ({ title, description, variant = "default", duration = 3000 }) => {
-    const id = Date.now();
+    // ✅ Clé vraiment unique
+    const id = crypto.randomUUID();
+
     setToasts((prev) => [...prev, { id, title, description, variant }]);
+
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id));
     }, duration);
@@ -22,7 +25,7 @@ export function ToastProvider({ children }) {
       <div className="fixed top-4 right-4 flex flex-col gap-2 z-50">
         {toasts.map((t) => (
           <div
-            key={t.id}
+            key={t.id} // utilise maintenant l'UUID unique
             className={`p-3 rounded shadow-lg border ${
               t.variant === "destructive"
                 ? "bg-red-100 border-red-400 text-red-700"

@@ -3,20 +3,28 @@ import React, { useState, useEffect } from "react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import logo from "../../assets/logo.png";
-import { Search, FileText, Download, CheckCircle, Clock, XCircle, Trash2, Plus } from "lucide-react";
+import { Search, FileText, Download, Trash2, Plus, Edit } from "lucide-react";
 import { supabase } from "../../config/supabaseClient.js";
 import { useToast } from "../ui/use-toast.jsx";
+import InvoiceForm from "./InvoiceForm.jsx";
 
 export default function InvoicesList({ invoices = [], refresh, onAdd }) {
   const [search, setSearch] = useState("");
   const [filtered, setFiltered] = useState(invoices || []);
   const { toast } = useToast();
+  const [editingInvoice, setEditingInvoice] = useState(null);
 
   useEffect(() => {
     setFiltered(
       (invoices || []).filter((inv) =>
-        [inv?.client_name, inv?.amount, inv?.id, inv?.status]
-          .join(" ")
+        [
+          inv?.client_name,
+          inv?.amount,
+          inv?.id,
+          inv?.status,
+          inv?.periode_debut,
+          inv?.periode_fin
+        ].join(" ")
           .toLowerCase()
           .includes(search.toLowerCase())
       )
@@ -30,17 +38,19 @@ export default function InvoicesList({ invoices = [], refresh, onAdd }) {
       minimumFractionDigits: 0,
     }).format(Number(amount || 0));
 
+  const formatDate = (d) => (d ? new Date(d).toLocaleDateString("fr-FR") : "N/A");
+
   const renderStatut = (status) => {
     const baseClass = "inline-flex items-center gap-1 px-3 py-1 text-xs font-medium rounded-full";
     switch (status?.toLowerCase()) {
       case "payee":
       case "payée":
-        return <span className={`${baseClass} bg-green-100 dark:bg-green-700/20 text-green-700 dark:text-green-300`}><CheckCircle size={14}/> Payée</span>;
+        return <span className={`${baseClass} bg-green-100 dark:bg-green-700/20 text-green-700 dark:text-green-300`}>Payée</span>;
       case "en_attente":
-        return <span className={`${baseClass} bg-yellow-100 dark:bg-yellow-700/20 text-yellow-700 dark:text-yellow-300`}><Clock size={14}/> En attente</span>;
+        return <span className={`${baseClass} bg-yellow-100 dark:bg-yellow-700/20 text-yellow-700 dark:text-yellow-300`}>En attente</span>;
       case "annulee":
       case "annulée":
-        return <span className={`${baseClass} bg-gray-100 dark:bg-gray-700/20 text-gray-700 dark:text-gray-300`}><XCircle size={14}/> Annulée</span>;
+        return <span className={`${baseClass} bg-gray-100 dark:bg-gray-700/20 text-gray-700 dark:text-gray-300`}>Annulée</span>;
       default:
         return <span className={`${baseClass} bg-blue-100 dark:bg-blue-700/20 text-blue-700 dark:text-blue-300`}>{status || "N/A"}</span>;
     }
@@ -85,19 +95,6 @@ export default function InvoicesList({ invoices = [], refresh, onAdd }) {
     img.onerror = generate;
   };
 
-  const markAsPaid = async (id) => {
-    const { error } = await supabase
-      .from("invoices")
-      .update({ status: "payée" })
-      .eq("id", id);
-    if (error) {
-      toast({ title: "Erreur", description: "Impossible de marquer comme payée", variant: "destructive" });
-    } else {
-      toast({ title: "Facture mise à jour", description: "La facture a été marquée comme payée." });
-      refresh();
-    }
-  };
-
   const handleDelete = async (id) => {
     if (!window.confirm("Supprimer cette facture ?")) return;
     const { error } = await supabase.from("invoices").delete().eq("id", id);
@@ -107,6 +104,15 @@ export default function InvoicesList({ invoices = [], refresh, onAdd }) {
       toast({ title: "Supprimée", description: "La facture a été supprimée." });
       refresh();
     }
+  };
+
+  const handleEdit = (invoice) => {
+    setEditingInvoice(invoice);
+  };
+
+  const handleCloseForm = () => {
+    setEditingInvoice(null);
+    refresh();
   };
 
   return (
@@ -146,6 +152,7 @@ export default function InvoicesList({ invoices = [], refresh, onAdd }) {
                 <th className="p-4">Montant</th>
                 <th className="p-4">Créée le</th>
                 <th className="p-4">Échéance</th>
+                <th className="p-4">Période</th>
                 <th className="p-4">Statut</th>
                 <th className="p-4 text-center">Actions</th>
               </tr>
@@ -155,8 +162,9 @@ export default function InvoicesList({ invoices = [], refresh, onAdd }) {
                 <tr key={inv.id} className="hover:bg-blue-50/40 dark:hover:bg-blue-900/30 transition">
                   <td className="p-4 font-semibold text-gray-800 dark:text-gray-200">{inv.client_name || "N/A"}</td>
                   <td className="p-4 font-bold text-green-600 dark:text-green-400 whitespace-nowrap">{currencyFormatter(inv.amount)}</td>
-                  <td className="p-4 text-gray-600 dark:text-gray-300">{new Date(inv.date_created).toLocaleDateString("fr-FR")}</td>
-                  <td className="p-4 text-gray-600 dark:text-gray-300">{new Date(inv.due_date).toLocaleDateString("fr-FR")}</td>
+                  <td className="p-4 text-gray-600 dark:text-gray-300">{formatDate(inv.date_created)}</td>
+                  <td className="p-4 text-gray-600 dark:text-gray-300">{formatDate(inv.due_date)}</td>
+                  <td className="p-4 text-gray-600 dark:text-gray-300">{formatDate(inv.periode_debut)} au {formatDate(inv.periode_fin)}</td>
                   <td className="p-4">{renderStatut(inv.status)}</td>
                   <td className="p-4 text-center whitespace-nowrap space-x-1">
                     <button
@@ -167,16 +175,11 @@ export default function InvoicesList({ invoices = [], refresh, onAdd }) {
                       <Download size={14}/> PDF
                     </button>
                     <button
-                      onClick={() => markAsPaid(inv.id)}
-                      disabled={inv.status?.toLowerCase() === "payee" || inv.status?.toLowerCase() === "payée"}
-                      className={`inline-flex items-center gap-1 px-3 py-1 text-xs rounded-full border ${
-                        inv.status?.toLowerCase().includes("pay") 
-                          ? "bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed" 
-                          : "border-green-600 dark:border-green-400 text-green-700 dark:text-green-300 hover:bg-green-50 dark:hover:bg-green-900/20"
-                      } transition`}
-                      title="Marquer comme payée"
+                      onClick={() => handleEdit(inv)}
+                      className="inline-flex items-center gap-1 px-3 py-1 text-xs rounded-full border border-blue-500 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition"
+                      title="Modifier"
                     >
-                      <CheckCircle size={14}/> Payée
+                      <Edit size={14}/> Edit
                     </button>
                     <button
                       onClick={() => handleDelete(inv.id)}
@@ -192,6 +195,24 @@ export default function InvoicesList({ invoices = [], refresh, onAdd }) {
           </table>
         )}
       </div>
+
+      {editingInvoice && (
+        <InvoiceForm
+          isOpen={!!editingInvoice}
+          onClose={handleCloseForm}
+          refresh={refresh}
+          initialData={{
+            id: editingInvoice.id,
+            invoiceNumber: editingInvoice.invoice_number || "",
+            clientId: editingInvoice.client_id,
+            clientName: editingInvoice.client_name || "",
+            description: editingInvoice.description || "",
+            periodeDebut: editingInvoice.periode_debut || "",
+            periodeFin: editingInvoice.periode_fin || "",
+            amount: editingInvoice.amount || 0,
+          }}
+        />
+      )}
     </div>
   );
 }
