@@ -24,14 +24,15 @@ const CardMissionGTS = ({ mission, chauffeur, camion, onEdit, onClose, onView, o
     case "Affectée": statutBg = "bg-yellow-600"; statutText = "text-white"; break;
     case "En Cours": statutBg = "bg-green-600"; statutText = "text-white"; break;
     case "En Chargement": statutBg = "bg-orange-600"; statutText = "text-white"; break;
+    case "En Déchargement": statutBg = "bg-indigo-600"; statutText = "text-white"; break;
     case STATUS_CLOSED: statutBg = "bg-gray-600"; statutText = "text-white"; break;
     default: statutBg = "bg-blue-600"; statutText = "text-white"; break;
   }
 
   return (
     <Card className={`shadow-lg p-4 bg-white/70 dark:bg-gray-800/70 border backdrop-blur-sm transition-all ${
-      mission.statut === "Affectée" 
-        ? "border-yellow-500 border-l-4" 
+      ["En Cours", "En Chargement", "En Déchargement"].includes(mission.statut)
+        ? "border-green-500 border-l-4 shadow-green-100/50 dark:shadow-none" 
         : "border-gray-200 dark:border-gray-700"
     }`}>
       <div className="flex justify-between items-start">
@@ -57,7 +58,7 @@ const CardMissionGTS = ({ mission, chauffeur, camion, onEdit, onClose, onView, o
         </div>
 
         <div className="flex flex-col gap-2 mt-1">
-          <span className={`text-xs font-semibold rounded-full px-2 py-1 text-center whitespace-nowrap ${statutBg} ${statutText}`}>
+          <span className={`text-[10px] font-bold uppercase rounded-full px-2 py-1 text-center whitespace-nowrap shadow-sm ${statutBg} ${statutText}`}>
             {mission.statut}
           </span>
         </div>
@@ -112,19 +113,14 @@ export default function MissionsSectionGTS() {
   const [showModal, setShowModal] = useState(false);
   const [editMission, setEditMission] = useState(null);
   const [detailsMission, setDetailsMission] = useState(null);
-
   const [chauffeurs, setChauffeurs] = useState([]);
   const [camions, setCamions] = useState([]);
   const [missions, setMissions] = useState([]);
-
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-
-  // States de confirmation (Clôture & Suppression)
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [selectedMissionId, setSelectedMissionId] = useState(null);
-
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchChauffeurs = useCallback(async () => {
@@ -150,7 +146,6 @@ export default function MissionsSectionGTS() {
     fetchMissions();
   }, [fetchChauffeurs, fetchCamions, fetchMissions]);
 
-  // --- ACTIONS ---
   const handleCloseMission = async (id) => {
     const today = new Date().toISOString().split("T")[0];
     await supabase.from("missions_gts").update({ statut: STATUS_CLOSED, date_cloture: today }).eq("id", id);
@@ -162,7 +157,7 @@ export default function MissionsSectionGTS() {
     fetchMissions();
   };
 
-  // --- LOGIQUE DE TRI ET FILTRAGE ---
+  // --- LOGIQUE DE TRI ET FILTRAGE CORRIGÉE ---
   const { paginatedMissions, totalPages } = useMemo(() => {
     const filtered = missions.filter((m) => {
       const chauffeur = chauffeurs.find((c) => c.id === m.chauffeur_id);
@@ -175,12 +170,23 @@ export default function MissionsSectionGTS() {
       );
     });
 
-    const statusPriority = { "Affectée": 1, "En Cours": 2, "En Chargement": 3, "Clôturée": 4 };
+    // PRIORITÉ : 1 pour les missions actives sur la route, 2 pour les affectées, 3 pour les clôturées
+    const statusPriority = { 
+        "En Cours": 1, 
+        "En Chargement": 1, 
+        "En Déchargement": 1, 
+        "Affectée": 2, 
+        "Clôturée": 3 
+    };
 
     const sorted = [...filtered].sort((a, b) => {
       const pA = statusPriority[a.statut] || 99;
       const pB = statusPriority[b.statut] || 99;
+      
+      // Si la priorité de statut est différente, on trie par statut
       if (pA !== pB) return pA - pB;
+      
+      // Si même statut, on trie par date la plus récente en haut
       return new Date(b.date) - new Date(a.date);
     });
 
@@ -202,19 +208,17 @@ export default function MissionsSectionGTS() {
         </CardHeader>
       </Card>
 
-      {/* Barre de recherche */}
       <div className="flex gap-3 items-center bg-white/80 dark:bg-gray-800/80 p-4 rounded-xl shadow border border-gray-100 dark:border-gray-700">
         <input
           type="text"
           placeholder="🔍 Rechercher chauffeur, camion ou date..."
           value={searchTerm}
           onChange={(e) => {setSearchTerm(e.target.value); setCurrentPage(1);}}
-          className="flex-1 border border-gray-300 dark:border-gray-600 rounded px-3 py-1 bg-white dark:bg-gray-700 dark:text-gray-200"
+          className="flex-1 border border-gray-300 dark:border-gray-600 rounded px-3 py-1 bg-white dark:bg-gray-700 dark:text-gray-200 focus:ring-2 focus:ring-blue-500 outline-none"
         />
         {isLoading && <Loader2 className="animate-spin text-blue-500" size={24} />}
       </div>
 
-      {/* Grille de missions */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {paginatedMissions.map((m) => (
           <CardMissionGTS
@@ -230,7 +234,6 @@ export default function MissionsSectionGTS() {
         ))}
       </div>
 
-      {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex justify-center gap-2 mt-4">
           {Array.from({ length: totalPages }, (_, i) => (
@@ -246,12 +249,10 @@ export default function MissionsSectionGTS() {
         </div>
       )}
 
-      {/* Modals & Dialogs */}
       {showModal && <OpenMissionModalGTS setShowModal={setShowModal} fetchMissions={fetchMissions} chauffeurs={chauffeurs} camions={camions} />}
       {editMission && <EditMissionModalGTS editingMission={editMission} setShowModal={setEditMission} fetchMissions={fetchMissions} />}
       {detailsMission && <DetailsMissionModalGTS mission={detailsMission} setShowModal={setDetailsMission} />}
 
-      {/* Dialogue de Clôture */}
       <ConfirmDialog
         open={confirmOpen}
         onClose={setConfirmOpen}
@@ -262,12 +263,11 @@ export default function MissionsSectionGTS() {
         onConfirm={async () => { await handleCloseMission(selectedMissionId); setConfirmOpen(false); }}
       />
 
-      {/* Dialogue de Suppression */}
       <ConfirmDialog
         open={confirmDeleteOpen}
         onClose={setConfirmDeleteOpen}
         title="Supprimer définitivement ?"
-        description="Êtes-vous sûr de vouloir supprimer cette mission de la base de données ? Cette action est irréversible."
+        description="Êtes-vous sûr de vouloir supprimer cette mission ? Cette action est irréversible."
         confirmLabel="Supprimer"
         confirmColor="bg-black hover:bg-gray-800"
         onConfirm={async () => { await handleDeleteMission(selectedMissionId); setConfirmDeleteOpen(false); }}

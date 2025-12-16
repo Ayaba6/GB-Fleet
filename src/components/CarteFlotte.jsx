@@ -1,3 +1,4 @@
+// src/components/CarteFlotte.jsx
 import React, { useEffect, useState, useMemo } from "react";
 import { MapContainer, TileLayer, Marker, Polyline, Tooltip } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
@@ -15,55 +16,40 @@ export default function CarteFlotte({ center = [12.3711, -1.5197] }) {
   const [missions, setMissions] = useState([]);
   const [positions, setPositions] = useState([]);
 
-  /* ==============================
-     1️⃣ Charger missions actives
-  ============================== */
+  // 1️⃣ Charger missions actives
   useEffect(() => {
     const fetchMissions = async () => {
       const { data, error } = await supabase
         .from("missions_gts")
-        .select(`
-          id,
-          titre,
-          camion:camions(id, immatriculation)
-        `)
+        .select(`id, titre, camion:camions(id, immatriculation)`)
         .in("statut", ["En Cours", "En Chargement", "En Déchargement"]);
 
-      if (error) {
-        console.error("Erreur fetch missions:", error);
-        return;
-      }
+      if (error) return console.error("Erreur fetch missions:", error);
       setMissions(data || []);
     };
-
     fetchMissions();
   }, []);
 
-  /* ==============================
-     2️⃣ Charger dernières positions + realtime
-  ============================== */
+  // 2️⃣ Charger dernières positions + realtime
   useEffect(() => {
     const fetchPositions = async () => {
       const { data, error } = await supabase
-        .from("missions_position")
+        .from("mission_positions")
         .select("*")
         .order("recorded_at", { ascending: true });
 
-      if (error) {
-        console.error("Erreur fetch positions:", error);
-        return;
-      }
+      if (error) return console.error("Erreur fetch positions:", error);
       setPositions(data || []);
     };
 
     fetchPositions();
 
-    // 🔴 Realtime
+    // Realtime
     const channel = supabase
       .channel("gps-tracking")
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "missions_position" },
+        { event: "INSERT", schema: "public", table: "mission_positions" },
         (payload) => {
           setPositions((prev) => [...prev, payload.new]);
         }
@@ -73,9 +59,7 @@ export default function CarteFlotte({ center = [12.3711, -1.5197] }) {
     return () => supabase.removeChannel(channel);
   }, []);
 
-  /* ==============================
-     3️⃣ Grouper positions par mission
-  ============================== */
+  // 3️⃣ Grouper positions par mission
   const positionsByMission = useMemo(() => {
     const map = {};
     positions.forEach((p) => {
@@ -86,9 +70,21 @@ export default function CarteFlotte({ center = [12.3711, -1.5197] }) {
     return map;
   }, [positions]);
 
+  // 4️⃣ Centre de la carte
+  const mapCenter = useMemo(() => {
+    for (let mission of missions) {
+      const trajets = positionsByMission[mission.id] || [];
+      if (trajets.length > 0) {
+        const last = trajets[trajets.length - 1];
+        return [parseFloat(last.latitude), parseFloat(last.longitude)];
+      }
+    }
+    return center;
+  }, [missions, positionsByMission, center]);
+
   return (
-    <div className="h-[600px] rounded-xl overflow-hidden border">
-      <MapContainer center={center} zoom={6} className="h-full w-full">
+    <div className="h-full w-full rounded-xl overflow-hidden border">
+      <MapContainer center={mapCenter} zoom={6} className="h-full w-full">
         <TileLayer
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           attribution="&copy; OpenStreetMap"
@@ -118,8 +114,7 @@ export default function CarteFlotte({ center = [12.3711, -1.5197] }) {
               >
                 <Tooltip direction="top" offset={[0, -10]} opacity={1}>
                   <div className="text-sm">
-                    <strong>🚛 Camion :</strong>{" "}
-                    {mission.camion?.immatriculation || "N/A"}
+                    <strong>🚛 Camion :</strong> {mission.camion?.immatriculation || "N/A"}
                     <br />
                     <strong>📄 Mission :</strong> {mission.titre || "N/A"}
                     <br />
