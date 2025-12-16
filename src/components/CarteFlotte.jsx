@@ -11,15 +11,13 @@ const camionIcon = new L.Icon({
   iconAnchor: [19, 38],
 });
 
-export default function CarteFlotte() {
+export default function CarteFlotte({ center = [12.3711, -1.5197] }) {
   const [missions, setMissions] = useState([]);
   const [positions, setPositions] = useState([]);
 
-  const center = [12.3711, -1.5197]; // Ouagadougou
-
-  /* =============================
+  /* ==============================
      1️⃣ Charger missions actives
-     ============================= */
+  ============================== */
   useEffect(() => {
     const fetchMissions = async () => {
       const { data, error } = await supabase
@@ -27,59 +25,61 @@ export default function CarteFlotte() {
         .select(`
           id,
           titre,
-          camion:camions(id, immatriculation),
-          chauffeur_id
+          camion:camions(id, immatriculation)
         `)
-        .eq("statut", "En cours");
+        .in("statut", ["En Cours", "En Chargement", "En Déchargement"]);
 
-      if (!error) setMissions(data || []);
+      if (error) {
+        console.error("Erreur fetch missions:", error);
+        return;
+      }
+      setMissions(data || []);
     };
 
     fetchMissions();
   }, []);
 
-  /* =============================
-     2️⃣ Charger dernières positions
-     ============================= */
+  /* ==============================
+     2️⃣ Charger dernières positions + realtime
+  ============================== */
   useEffect(() => {
     const fetchPositions = async () => {
-      const { data } = await supabase
-        .from("mission_positions")
+      const { data, error } = await supabase
+        .from("missions_position")
         .select("*")
-        .order("created_at", { ascending: true });
+        .order("recorded_at", { ascending: true });
 
+      if (error) {
+        console.error("Erreur fetch positions:", error);
+        return;
+      }
       setPositions(data || []);
     };
 
     fetchPositions();
 
-    /* 🔴 TEMPS RÉEL */
+    // 🔴 Realtime
     const channel = supabase
       .channel("gps-tracking")
       .on(
         "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "mission_positions",
-        },
-        payload => {
-          setPositions(prev => [...prev, payload.new]);
+        { event: "INSERT", schema: "public", table: "missions_position" },
+        (payload) => {
+          setPositions((prev) => [...prev, payload.new]);
         }
       )
       .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => supabase.removeChannel(channel);
   }, []);
 
-  /* =============================
-     3️⃣ Positions par mission
-     ============================= */
+  /* ==============================
+     3️⃣ Grouper positions par mission
+  ============================== */
   const positionsByMission = useMemo(() => {
     const map = {};
-    positions.forEach(p => {
+    positions.forEach((p) => {
+      if (!p.mission_id) return;
       if (!map[p.mission_id]) map[p.mission_id] = [];
       map[p.mission_id].push(p);
     });
@@ -94,7 +94,7 @@ export default function CarteFlotte() {
           attribution="&copy; OpenStreetMap"
         />
 
-        {missions.map(mission => {
+        {missions.map((mission) => {
           const trajets = positionsByMission[mission.id] || [];
           if (trajets.length === 0) return null;
 
@@ -105,7 +105,7 @@ export default function CarteFlotte() {
               {/* Trajet */}
               {trajets.length > 1 && (
                 <Polyline
-                  positions={trajets.map(p => [p.latitude, p.longitude])}
+                  positions={trajets.map((p) => [parseFloat(p.latitude), parseFloat(p.longitude)])}
                   color="blue"
                   weight={4}
                 />
@@ -113,18 +113,18 @@ export default function CarteFlotte() {
 
               {/* Camion */}
               <Marker
-                position={[last.latitude, last.longitude]}
+                position={[parseFloat(last.latitude), parseFloat(last.longitude)]}
                 icon={camionIcon}
               >
                 <Tooltip direction="top" offset={[0, -10]} opacity={1}>
                   <div className="text-sm">
                     <strong>🚛 Camion :</strong>{" "}
-                    {mission.camion?.immatriculation}
+                    {mission.camion?.immatriculation || "N/A"}
                     <br />
-                    <strong>📄 Mission :</strong> {mission.titre}
+                    <strong>📄 Mission :</strong> {mission.titre || "N/A"}
                     <br />
                     <strong>🕒 Dernière maj :</strong>{" "}
-                    {new Date(last.created_at).toLocaleTimeString()}
+                    {new Date(last.recorded_at).toLocaleTimeString("fr-FR")}
                   </div>
                 </Tooltip>
               </Marker>
