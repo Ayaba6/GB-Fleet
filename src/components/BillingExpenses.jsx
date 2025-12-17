@@ -125,7 +125,7 @@ export default function BillingExpenses() {
         {loading ? <p>Chargement...</p> : <FinanceChart invoices={[...baticomInvoices, ...gtsInvoices]} expenses={expenses} />}
       </div>
 
-      {/* Tabs Factures / Dépenses */}
+      {/* Tabs Factures / Dépense */}
       <Tabs
         defaultValue="invoices"
         tabs={[
