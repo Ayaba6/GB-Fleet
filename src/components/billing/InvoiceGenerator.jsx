@@ -83,27 +83,74 @@ export function generateInvoicePDF(invoiceData) {
   doc.setFontSize(11);
   doc.text(`Ouagadougou, le ${today}`, 196, 46, { align: "right" });
 
-  // --- Titre ---
-  doc.setFont("times", "bold"); // <- Times
-  doc.setFontSize(16);
-  doc.text("FACTURE", 105, 62, { align: "center" });
+  
 
   // --- Infos client ---
-  let y = 74;
-  doc.setFontSize(12);
-  doc.setFont("times", "bold"); // <- Times
-  doc.text(invoiceData.invoiceNumber, 14, y);
-  doc.setFont("times", "normal"); // <- Times
-  doc.setFontSize(11);
-  doc.text(`Doit : ${invoiceData.clientName}`, 14, y + 6);
+let y = 74;
 
-  let infoY = y + 12;
-  doc.text(`${invoiceData.clientAddress}, RCCM: ${invoiceData.clientRCCM}`, 25, infoY);
-  infoY += 5;
-  doc.text(`IFU: ${invoiceData.clientIFU}  Tel: ${invoiceData.clientTel}`, 25, infoY);
-  infoY += 5;
-  doc.text(`Objet: ${invoiceData.objet}`, 14, infoY);
-  infoY += 5;
+y -= 6; // 🔼 remonte le bloc numéro de facture
+
+// Numéro de facture (gras + souligné)
+doc.setFontSize(12);
+doc.setFont("times", "bold");
+doc.text(invoiceData.invoiceNumber, 14, y);
+doc.line(
+  14,
+  y + 1,
+  14 + doc.getTextWidth(invoiceData.invoiceNumber),
+  y + 1
+);
+
+
+// Doit : Nom client
+doc.setFontSize(11);
+doc.text("Doit", 14, y + 6);
+doc.line(14, y + 7, 14 + doc.getTextWidth("Doit"), y + 7);
+doc.setFont("times", "normal");
+doc.text(`: ${invoiceData.clientName}`, 24, y + 6);
+
+// Ligne suivante
+let infoY = y + 12;
+
+// Adresse + RCCM (même ligne)
+doc.setFont("times", "bold");
+doc.text("Adresse", 14, infoY);
+doc.line(14, infoY + 1, 14 + doc.getTextWidth("Adresse"), infoY + 1);
+doc.setFont("times", "normal");
+doc.text(`: ${invoiceData.clientAddress}`, 32, infoY);
+
+doc.setFont("times", "bold");
+doc.text("RCCM", 100, infoY);
+doc.line(100, infoY + 1, 100 + doc.getTextWidth("RCCM"), infoY + 1);
+doc.setFont("times", "normal");
+doc.text(`: ${invoiceData.clientRCCM}`, 113, infoY);
+
+infoY += 6;
+
+// IFU + Téléphone (même ligne)
+doc.setFont("times", "bold");
+doc.text("IFU", 14, infoY);
+doc.line(14, infoY + 1, 14 + doc.getTextWidth("IFU"), infoY + 1);
+doc.setFont("times", "normal");
+doc.text(`: ${invoiceData.clientIFU}`, 24, infoY);
+
+doc.setFont("times", "bold");
+doc.text("Tél", 50, infoY);
+doc.line(50, infoY + 1, 53 + doc.getTextWidth("Tél"), infoY + 1);
+doc.setFont("times", "normal");
+doc.text(`: ${invoiceData.clientTel}`, 58, infoY);
+
+infoY += 6;
+
+// Objet
+doc.setFont("times", "bold");
+doc.text("Objet", 14, infoY);
+doc.line(14, infoY + 1, 14 + doc.getTextWidth("Objet"), infoY + 1);
+doc.setFont("times", "normal");
+doc.text(`: ${invoiceData.objet}`, 30, infoY);
+
+infoY += 8;
+
 
   // 🔹 Période
   if (invoiceData.periodeDebut && invoiceData.periodeFin) {
@@ -111,7 +158,7 @@ export function generateInvoicePDF(invoiceData) {
   } else {
     doc.text(`Période: ${invoiceData.periode || ""}`, 14, infoY);
   }
-  infoY += 10;
+  infoY += 16;
 
   // --- Tableau Résumé ---
   let resumeTotal = 0;
@@ -194,7 +241,7 @@ export function generateInvoicePDF(invoiceData) {
     infoY += lines.length * 6 + 12;
     doc.setFont("times", "bold"); // <- Times
     doc.text("Le Directeur", 160, infoY);
-    infoY += 23;
+    infoY += 25;
     doc.text("KERE Leger", 160, infoY);
   }
 
