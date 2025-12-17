@@ -248,6 +248,36 @@ y += 10;
     y += 30;
     doc.text("KERE Leger",158,y);
   }
+  
+ /* =========================
+   PIED DE PAGE GTS
+========================= */
+
+// Ligne de séparation
+doc.setDrawColor(180, 180, 180);
+doc.setLineWidth(0.3);
+doc.line(14, pageHeight - 25, 196, pageHeight - 25);
+
+// Texte pied de page (multi-lignes et centré)
+doc.setFont("times", "normal");
+doc.setFontSize(9);
+doc.setTextColor(80, 80, 80);
+
+const footerTextGTS =
+  "GTS SAS | RCCM: BFOUA2020B3691 | IFU: 00136236Y | Régime fiscal: RSI | Division fiscale: DCI OUAGA V | Tél: +226 25 50 89 91 / 78 82 62 16 / 70 00 80 24 | BP 9342 Ouagadougou 06 | Mail: contact@gts.bf";
+
+// Découpage automatique pour tenir dans 180 mm de largeur
+const lines = doc.splitTextToSize(footerTextGTS, 180);
+
+// Position verticale du premier texte
+let footerY = pageHeight - 18 - (lines.length - 1) * 4;
+
+// Affichage ligne par ligne, centré
+lines.forEach((line, index) => {
+  doc.text(line, 105, footerY + index * 4, { align: "center" });
+});
+
+
 
   return doc;
 };

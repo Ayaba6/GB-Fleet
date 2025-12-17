@@ -76,7 +76,7 @@ export function generateInvoicePDF(invoiceData) {
     35,
     { align: "center" }
   );
-  doc.line(14, 38, 196, 38);
+  doc.line(2, 38, 208, 38);
 
   // --- Date ---
   const today = new Date().toLocaleDateString("fr-FR");
@@ -250,6 +250,32 @@ infoY += 8;
     infoY += 25;
     doc.text("KERE Leger", 160, infoY);
   }
+  
+  /* =========================
+   PIED DE PAGE (UNE LIGNE)
+========================= */
+
+const pageHeight = doc.internal.pageSize.getHeight();
+
+// 🔹 Ligne de séparation
+doc.setDrawColor(180, 180, 180);
+doc.setLineWidth(0.3);
+doc.line(2, pageHeight - 18, 208, pageHeight - 18);
+
+// 🔹 Texte pied de page sur une seule ligne
+doc.setFont("times", "normal");
+doc.setFontSize(9);
+doc.setTextColor(80, 80, 80);
+
+const footerText =
+  "RCCM: BF OUA 2024 M 14724 | IFU: 00084263L | COMPTE VISTA BANK : NOBF023-01053-031142800193-49";
+
+doc.text(footerText, 105, pageHeight - 12, {
+  align: "center",
+  maxWidth: 180,
+});
+
 
   return doc;
 }
+
