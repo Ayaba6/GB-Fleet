@@ -10,7 +10,7 @@ import EditDayModalBaticom from "./modals/EditDayModalBaticom.jsx";
 import DetailsJourneeModal from "./modals/DetailsJourneeModal.jsx";
 import ConfirmDialog from "../components/ui/ConfirmDialog.jsx";
 
-const ITEMS_PER_PAGE = 10;
+const ITEMS_PER_PAGE = 13;
 const STRUCTURE = "BATICOM";
 const STATUS_CLOSED = "clôturée";
 

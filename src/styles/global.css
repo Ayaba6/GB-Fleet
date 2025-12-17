@@ -29,6 +29,30 @@
 .animate-scalePulse { animation: scalePulse 1.2s ease-in-out infinite; }
 
 /* ======================================================= */
+/* ====== CLIGNOTEMENT PANNE (ALERTE ROUGE) ====== */
+/* ======================================================= */
+body.dark .animate-blink-red {
+  background-color: rgba(239, 68, 68, 0.18);
+}
+
+
+@keyframes blink-red {
+  0%, 100% {
+    box-shadow: 0 0 0 rgba(239, 68, 68, 0);
+    background-color: rgba(239, 68, 68, 0.08);
+  }
+  50% {
+    box-shadow: 0 0 28px rgba(239, 68, 68, 0.9);
+    background-color: rgba(239, 68, 68, 0.22);
+  }
+}
+
+.animate-blink-red {
+  animation: blink-red 1.2s ease-in-out infinite;
+}
+
+
+/* ======================================================= */
 /* ====== 2. RESET ET BASE (Simplifié) ====== */
 /* ======================================================= */
 /* Tailwind Preflight (base) gère déjà margin, padding, et box-sizing */

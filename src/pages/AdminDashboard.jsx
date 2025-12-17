@@ -6,7 +6,7 @@ import {
   Users,
   Truck,
   ClipboardList,
-  Wrench,
+  AlertTriangle,
   FileWarning,
   Sun,
   Moon,
@@ -23,7 +23,7 @@ import PannesDeclarees from "../components/PannesSectionAdmin.jsx";
 import AlertesExpiration from "../components/AlertesExpiration.jsx";
 import CarteFlotte from "../components/CarteFlotte.jsx";
 import BillingExpenses from "../components/BillingExpenses.jsx";
-import MaintenanceSection from "../components/MaintenanceSection.jsx"; // ✅ Import maintenance
+import MaintenanceSection from "../components/MaintenanceSection.jsx";
 
 // ShadCN mock components
 const Card = ({ className = "", children }) => (
@@ -45,7 +45,7 @@ const SECTION_TITLES = {
   camions: "Gestion de la Flotte",
   missions: "Missions",
   pannes: "Pannes Déclarées",
-  maintenance: "Maintenance Camions", // ✅ ajout
+  maintenance: "Maintenance Camions",
   documents: "Alertes Documents",
   billing: "Facturation et Dépenses",
 };
@@ -59,21 +59,26 @@ const COLOR_SCHEMES = {
   purple: { text: "text-purple-700 dark:text-purple-300" },
 };
 
-// Card Component
-const StatCard = ({ title, value, icon: Icon, color, onClick }) => {
+// Card Component with optional blink
+const StatCard = ({ title, value, icon: Icon, color, onClick, blink = false }) => {
   const scheme = COLOR_SCHEMES[color] || COLOR_SCHEMES.blue;
 
   return (
     <button
       onClick={onClick}
-      className="flex flex-col items-center justify-center p-6 rounded-xl 
-      border border-gray-200 dark:border-gray-700
-      bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm
-      hover:shadow-2xl hover:scale-[1.03] transition-all
-      w-full text-center group"
+      className={`
+        flex flex-col items-center justify-center p-6 rounded-xl 
+        border border-gray-200 dark:border-gray-700
+        bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm
+        hover:shadow-2xl hover:scale-[1.03] transition-all
+        w-full text-center group
+        ${blink ? "animate-pulse border-red-500" : ""}
+      `}
     >
       <Icon
-        className={`w-10 h-10 mb-2 ${scheme.text} group-hover:rotate-6 transition-transform`}
+        className={`w-10 h-10 mb-2 ${
+          blink ? "text-red-600 dark:text-red-400" : scheme.text
+        } group-hover:rotate-6 transition-transform`}
       />
       <h3 className={`font-semibold text-lg mb-1 ${scheme.text}`}>
         {title}
@@ -93,8 +98,11 @@ export default function AdminDashboard() {
     users: 0,
     camions: 0,
     missions: 0,
-    pannes: 0
+    pannes: 0,
+    docs: 0
   });
+  const [hasPanneEnCours, setHasPanneEnCours] = useState(false);
+  const [hasDocsUrgents, setHasDocsUrgents] = useState(false);
 
   const [camions, setCamions] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -120,7 +128,7 @@ export default function AdminDashboard() {
     localStorage.setItem("darkMode", mode);
   };
 
-  // ✅ FETCH DASHBOARD DATA
+  // FETCH DASHBOARD DATA
   const fetchData = useCallback(async () => {
     setLoading(true);
 
@@ -150,29 +158,52 @@ export default function AdminDashboard() {
         camionsRes,
         missionsBaticomRes,
         missionsGtsRes,
-        pannesRes
+        pannesRes,
+        panneEnCoursRes
       ] = await Promise.all([
         supabase.from("profiles").select("id", { count: "exact", head: true }),
         supabase.from("camions").select("*"),
-        supabase.from("journee_baticom")
-          .select("id", { count: "exact", head: true }),
-        supabase.from("missions_gts")
-          .select("id", { count: "exact", head: true }),
-        supabase.from("alertespannes")
-          .select("id", { count: "exact", head: true })
+        supabase.from("journee_baticom").select("id", { count: "exact", head: true }),
+        supabase.from("missions_gts").select("id", { count: "exact", head: true }),
+        supabase.from("alertespannes").select("id", { count: "exact", head: true }),
+        supabase.from("alertespannes").select("id").eq("statut", "en_cours")
       ]);
 
       const totalMissions =
         (missionsBaticomRes.count || 0) +
         (missionsGtsRes.count || 0);
 
+      // --- Calcul documents urgents ---
+      const today = new Date();
+      const docsList = [];
+
+      (usersRes.data || []).forEach(p => {
+        if (p.cnib_expiration) docsList.push(new Date(p.cnib_expiration));
+        if (p.permis_expiration) docsList.push(new Date(p.permis_expiration));
+        if (p.carte_expiration) docsList.push(new Date(p.carte_expiration));
+      });
+
+      (camionsRes.data || []).forEach(c => {
+        if (c.cartegriseexpiry) docsList.push(new Date(c.cartegriseexpiry));
+        if (c.assuranceexpiry) docsList.push(new Date(c.assuranceexpiry));
+        if (c.visitetechniqueexpiry) docsList.push(new Date(c.visitetechniqueexpiry));
+      });
+
+      const docsUrgents = docsList.filter(d => {
+        const diff = Math.ceil((d - today) / (1000 * 60 * 60 * 24));
+        return diff >= 0 && diff <= 15;
+      }).length;
+
       setStats({
         users: usersRes.count || 0,
         camions: camionsRes.data?.length || 0,
         missions: totalMissions,
-        pannes: pannesRes.count || 0
+        pannes: panneEnCoursRes.data?.length || 0,
+        docs: docsUrgents
       });
 
+      setHasPanneEnCours((panneEnCoursRes.data || []).length > 0);
+      setHasDocsUrgents(docsUrgents > 0);
       setCamions(camionsRes.data || []);
 
     } catch (e) {
@@ -202,7 +233,6 @@ export default function AdminDashboard() {
   const sectionsMap = {
     dashboard: (
       <div className="space-y-6 w-full">
-        {/* --- Tableau de bord inchangé --- */}
         <Card className="shadow-lg bg-white/80 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 w-full backdrop-blur-sm">
           <CardHeader>
             <h2 className="text-xl sm:text-2xl font-bold text-gray-800 dark:text-gray-100 flex items-center gap-3">
@@ -239,15 +269,17 @@ export default function AdminDashboard() {
               <StatCard
                 title="Pannes"
                 value={stats.pannes}
-                icon={Wrench}
+                icon={AlertTriangle}
                 color="red"
+                blink={hasPanneEnCours}
                 onClick={() => setSection("pannes")}
               />
               <StatCard
                 title="Docs"
-                value={""}
+                value={stats.docs}
                 icon={FileWarning}
                 color="purple"
+                blink={hasDocsUrgents}
                 onClick={() => setSection("documents")}
               />
             </div>
@@ -272,7 +304,7 @@ export default function AdminDashboard() {
     camions: <CamionsSection />,
     missions: <MissionsSection />,
     pannes: <PannesDeclarees />,
-    maintenance: <MaintenanceSection camions={camions} />, // ✅ ajout maintenance
+    maintenance: <MaintenanceSection camions={camions} />,
     documents: <AlertesExpiration />,
     billing: <BillingExpenses />
   };
