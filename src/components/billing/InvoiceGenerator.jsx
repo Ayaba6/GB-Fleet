@@ -68,7 +68,7 @@ export function generateInvoicePDF(invoiceData) {
 
   // --- Logo & entête ---
   doc.addImage(logo, "PNG", 14, 10, 50, 20);
-  doc.setFont("helvetica", "normal");
+  doc.setFont("times", "normal"); // <- Times
   doc.setFontSize(10);
   doc.text(
     "BP 9342 OUAGA 06 | Tel: 25 50 81 89 / 70 00 80 24 | Mail: contact@baticom.bf",
@@ -84,16 +84,16 @@ export function generateInvoicePDF(invoiceData) {
   doc.text(`Ouagadougou, le ${today}`, 196, 46, { align: "right" });
 
   // --- Titre ---
-  doc.setFont("helvetica", "bold");
+  doc.setFont("times", "bold"); // <- Times
   doc.setFontSize(16);
   doc.text("FACTURE", 105, 62, { align: "center" });
 
   // --- Infos client ---
   let y = 74;
   doc.setFontSize(12);
-  doc.setFont("helvetica", "bold");
+  doc.setFont("times", "bold"); // <- Times
   doc.text(invoiceData.invoiceNumber, 14, y);
-  doc.setFont("helvetica", "normal");
+  doc.setFont("times", "normal"); // <- Times
   doc.setFontSize(11);
   doc.text(`Doit : ${invoiceData.clientName}`, 14, y + 6);
 
@@ -105,7 +105,7 @@ export function generateInvoicePDF(invoiceData) {
   doc.text(`Objet: ${invoiceData.objet}`, 14, infoY);
   infoY += 5;
 
-  // 🔹 Période : deux dates
+  // 🔹 Période
   if (invoiceData.periodeDebut && invoiceData.periodeFin) {
     doc.text(`Période: du ${invoiceData.periodeDebut} au ${invoiceData.periodeFin}`, 14, infoY);
   } else {
@@ -116,7 +116,7 @@ export function generateInvoicePDF(invoiceData) {
   // --- Tableau Résumé ---
   let resumeTotal = 0;
   if (invoiceData.summaryData?.length) {
-    doc.setFont("helvetica", "bold");
+    doc.setFont("times", "bold"); // <- Times
     doc.setTextColor(0, 0, 128);
     doc.text("Détails de paiement", 14, infoY);
     infoY += 5;
@@ -130,7 +130,7 @@ export function generateInvoicePDF(invoiceData) {
       ]),
       theme: "grid",
       headStyles: { fillColor: [50, 50, 50], textColor: 255, fontStyle: "bold" },
-      styles: { fontSize: 10 },
+      styles: { font: "times", fontSize: 10 }, // <- Times
       columnStyles: { 
         0: { cellWidth: 120 },
         1: { cellWidth: 60, halign: "right", valign: "middle" }
@@ -145,7 +145,7 @@ export function generateInvoicePDF(invoiceData) {
 
   // --- Tableau Détails ---
   if (invoiceData.itemsData?.length) {
-    doc.setFont("helvetica", "bold");
+    doc.setFont("times", "bold"); // <- Times
     doc.setTextColor(0, 0, 128);
     doc.text("Détails contractuels", 14, infoY);
     infoY += 5;
@@ -161,7 +161,7 @@ export function generateInvoicePDF(invoiceData) {
       ]),
       theme: "grid",
       headStyles: { fillColor: [50, 50, 50], textColor: 255, fontStyle: "bold" },
-      styles: { fontSize: 10 },
+      styles: { font: "times", fontSize: 10 }, // <- Times
       columnStyles: {
         0: { cellWidth: 80 },
         1: { cellWidth: 40, halign: "right", valign: "middle" },
@@ -177,14 +177,14 @@ export function generateInvoicePDF(invoiceData) {
   if (resumeTotal > 0) {
     const totalInWords = convertNumberToWords(resumeTotal);
 
-    doc.setFont("helvetica", "bold");
+    doc.setFont("times", "bold"); // <- Times
     doc.setFontSize(11);
     doc.setTextColor(0, 0, 128);
     doc.text("Arrêtée la présente facture à la somme HTVA de :", 14, infoY);
 
     infoY += 6;
 
-    doc.setFont("helvetica", "normal");
+    doc.setFont("times", "normal"); // <- Times
     doc.setTextColor(0, 0, 0);
     const montantText = `${totalInWords.charAt(0).toUpperCase() + totalInWords.slice(1)} (${formatNumberWithSpace(resumeTotal)}) francs CFA.`;
     const lines = doc.splitTextToSize(montantText, 180);
@@ -192,7 +192,7 @@ export function generateInvoicePDF(invoiceData) {
 
     // --- Signature Directeur ---
     infoY += lines.length * 6 + 12;
-    doc.setFont("helvetica", "bold");
+    doc.setFont("times", "bold"); // <- Times
     doc.text("Le Directeur", 160, infoY);
     infoY += 23;
     doc.text("KERE Leger", 160, infoY);
