@@ -9,7 +9,7 @@ import EditMissionModalGTS from "./modals/EditMissionModalGTS.jsx";
 import DetailsMissionModalGTS from "./modals/DetailsMissionModalGTS.jsx";
 import ConfirmDialog from "../components/ui/ConfirmDialog.jsx";
 
-const ITEMS_PER_PAGE = 10;
+const ITEMS_PER_PAGE = 12;
 const STRUCTURE = "GTS";
 const STATUS_CLOSED = "Clôturée";
 

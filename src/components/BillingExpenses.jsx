@@ -9,11 +9,8 @@ import FinanceChart from "../components/billing/FinanceChart.jsx";
 import InvoiceForm from "../components/billing/InvoiceFormContainer.jsx"; // BATICOM
 import GTSInvoiceForm from "../components/billing/GTSInvoiceForm.jsx"; // GTS
 import ExpenseForm from "../components/billing/ExpenseForm.jsx";
-import { DollarSign, TrendingUp, TrendingDown, LayoutDashboard, Plus, File, FileText } from "lucide-react";
+import { DollarSign, TrendingUp, TrendingDown, LayoutDashboard, Plus } from "lucide-react";
 import { Button } from "../components/ui/button.jsx";
-import * as XLSX from "xlsx";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
 import { useToast } from "../components/ui/use-toast.jsx";
 
 export default function BillingExpenses() {
@@ -94,42 +91,6 @@ export default function BillingExpenses() {
     </div>
   );
 
-  // --- Export Excel / PDF ---
-  const exportExcel = () => {
-    const wsData = [
-      ...baticomInvoices.map(i => ({ Type: "Facture BATICOM", ...i })),
-      ...gtsInvoices.map(i => ({ Type: "Facture GTS", ...i })),
-      ...expenses.map(e => ({ Type: "Dépense", ...e }))
-    ];
-    const ws = XLSX.utils.json_to_sheet(wsData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Finance");
-    XLSX.writeFile(wb, "finance.xlsx");
-    toast({ title: "Export Excel", description: "Fichier exporté avec succès." });
-  };
-
-  const exportPDF = () => {
-    const doc = new jsPDF();
-    doc.setFontSize(16);
-    doc.text("Finance - Factures & Dépenses", 14, 20);
-
-    autoTable(doc, {
-      startY: 30,
-      head: [["Type", "Montant", "Camion", "Date", "Description"]],
-      body: [
-        ...baticomInvoices.map(i => ["Facture BATICOM", currencyFormatter.format(i.amount), i.camion_id || "-", new Date(i.date_created).toLocaleDateString(), i.description || "-"]),
-        ...gtsInvoices.map(i => ["Facture GTS", currencyFormatter.format(i.amount), i.camion_id || "-", new Date(i.date_created).toLocaleDateString(), i.description || "-"]),
-        ...expenses.map(e => ["Dépense", currencyFormatter.format(e.amount), e.camion_id || "-", new Date(e.date).toLocaleDateString(), e.description || "-"]),
-      ],
-      theme: "grid",
-      styles: { fontSize: 9 },
-      headStyles: { fillColor: [240, 240, 240] },
-    });
-
-    doc.save("finance.pdf");
-    toast({ title: "Export PDF", description: "Document généré avec succès." });
-  };
-
   return (
     <div className="space-y-8">
       {/* Header & Actions */}
@@ -147,12 +108,6 @@ export default function BillingExpenses() {
           </Button>
           <Button onClick={() => setIsExpenseModalOpen(true)} className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white">
             <Plus size={18} /> Ajouter Dépense
-          </Button>
-          <Button onClick={exportExcel} className="flex items-center gap-2 border border-gray-300 bg-gray-100 hover:bg-gray-200 text-gray-700">
-            <File size={16} /> Excel
-          </Button>
-          <Button onClick={exportPDF} className="flex items-center gap-2 border border-gray-300 bg-gray-100 hover:bg-gray-200 text-gray-700">
-            <FileText size={16} /> PDF
           </Button>
         </div>
       </div>
