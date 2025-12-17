@@ -6,7 +6,7 @@ import logo from "../../assets/logo.png";
 import { Search, FileText, Download, Trash2, Plus, Edit } from "lucide-react";
 import { supabase } from "../../config/supabaseClient.js";
 import { useToast } from "../ui/use-toast.jsx";
-import InvoiceForm from "./InvoiceForm.jsx";
+import InvoiceForm from "./InvoiceFormContainer.jsx";
 
 export default function InvoicesList({ invoices = [], refresh, onAdd }) {
   const [search, setSearch] = useState("");
