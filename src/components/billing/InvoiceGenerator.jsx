@@ -143,13 +143,19 @@ doc.text(`: ${invoiceData.clientTel}`, 58, infoY);
 infoY += 6;
 
 // Objet
+const objet = invoiceData.description || "-";
+
 doc.setFont("times", "bold");
 doc.text("Objet", 14, infoY);
 doc.line(14, infoY + 1, 14 + doc.getTextWidth("Objet"), infoY + 1);
+
 doc.setFont("times", "normal");
-doc.text(`: ${invoiceData.objet}`, 30, infoY);
+doc.text(`: ${objet}`, 30, infoY);
 
 infoY += 8;
+
+
+
 
 
   // 🔹 Période
