@@ -5,11 +5,15 @@ import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import { supabase } from "../config/supabaseClient";
 
-// 🚛 Icône camion
+// ✅ Import de l'image locale pour le camion
+import camionImg from "../assets/camion_benne.png";
+
+// Icône Leaflet pour le camion
 const camionIcon = new L.Icon({
-  iconUrl: "https://cdn-icons-png.flaticon.com/512/744/744465.png",
-  iconSize: [38, 38],
-  iconAnchor: [19, 38],
+  iconUrl: camionImg, // image locale
+  iconSize: [40, 40],
+  iconAnchor: [20, 40],
+  popupAnchor: [0, -40],
 });
 
 export default function CarteFlotte({ center = [12.3711, -1.5197] }) {
@@ -110,7 +114,7 @@ export default function CarteFlotte({ center = [12.3711, -1.5197] }) {
               {/* Camion */}
               <Marker
                 position={[parseFloat(last.latitude), parseFloat(last.longitude)]}
-                icon={camionIcon}
+                icon={camionIcon} // icône locale
               >
                 <Tooltip direction="top" offset={[0, -10]} opacity={1}>
                   <div className="text-sm">

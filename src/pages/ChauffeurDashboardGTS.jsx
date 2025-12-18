@@ -7,7 +7,7 @@ import { Button } from "../components/ui/button.jsx";
 import { useToast } from "../components/ui/use-toast.jsx";
 import {
   LogOut, Moon, Sun, Loader2, User, Home, History, Truck, Clock, Calendar,
-  MessageSquare, Wrench, Route, CheckCircle, Scale, Map
+  MessageSquare, Wrench, Route, CheckCircle, Scale
 } from "lucide-react";
 
 // Imports des composants spécifiques GTS
@@ -280,15 +280,13 @@ export default function ChauffeurDashboardGTS({ session }) {
     return () => { if (channel) supabase.removeChannel(channel); };
   }, [chauffeurId, fetchMissions]);
 
-  // --- Déconnexion corrigée (utilise scope local pour éviter 403 global) ---
+  // --- Déconnexion ---
   const handleSignOut = async () => {
     try {
-      // Essayer avec scope local (évite le problème 403 quand global est bloqué)
       const { error } = await supabase.auth.signOut({ scope: "local" });
       if (error) throw error;
       navigate("/login");
     } catch (err) {
-      // Fallback : appeler signOut sans option si scope local échoue
       try {
         const { error: e2 } = await supabase.auth.signOut();
         if (e2) throw e2;
@@ -304,9 +302,6 @@ export default function ChauffeurDashboardGTS({ session }) {
     window.open(url, "_blank");
   };
 
-  // handleSignalEntry : gère 2 transitions côté chauffeur :
-  // - En Cours -> En Chargement (entered_lome_at)
-  // - En Chargement -> En Déchargement (returned_ouaga_at)  -- admin clôturera plus tard
   const handleSignalEntry = async (mission) => {
     setLoading(true);
     try {
@@ -317,14 +312,12 @@ export default function ChauffeurDashboardGTS({ session }) {
       else if (mission.statut === "En Chargement") newStatut = "En Déchargement";
 
       if (!newStatut) {
-        // Rien à faire (ex : déjà en déchargement/terminée)
         setLoading(false);
         return;
       }
 
       const updates = { statut: newStatut };
       if (newStatut === "En Chargement") updates.entered_lome_at = now;
-      // IMPORTANT: la colonne dans la table est `returned_ouaga_at` (retour à Ouaga)
       if (newStatut === "En Déchargement") updates.returned_ouaga_at = now;
 
       const { error } = await supabase.from("missions_gts").update(updates).eq("id", mission.id);
@@ -339,15 +332,47 @@ export default function ChauffeurDashboardGTS({ session }) {
     }
   };
 
+  // --- Démarrage mission avec insertion position GPS ---
   const handleStartMission = async (mission) => {
     try {
       setLoading(true);
-      const { error } = await supabase.from("missions_gts").update({ statut: "En Cours", started_at: new Date().toISOString() }).eq("id", mission.id);
-      if (error) throw error;
-      toast({ title: "Mission démarrée", description: "Le statut a été mis à jour à 'En Cours'." });
+
+      const getCurrentPosition = () =>
+        new Promise((resolve, reject) => {
+          if (!navigator.geolocation) return reject(new Error("Géolocalisation non supportée"));
+          navigator.geolocation.getCurrentPosition(
+            (position) => resolve(position.coords),
+            (error) => reject(error)
+          );
+        });
+
+      const coords = await getCurrentPosition();
+      const { latitude, longitude } = coords;
+      const now = new Date().toISOString();
+
+      const { error: updateError } = await supabase
+        .from("missions_gts")
+        .update({ statut: "En Cours", started_at: now })
+        .eq("id", mission.id);
+      if (updateError) throw updateError;
+
+      const { error: insertError } = await supabase
+        .from("mission_positions")
+        .insert([{
+          mission_id: mission.id,
+          chauffeur_id: mission.chauffeur_id,
+          camion_id: mission.camion_id,
+          latitude,
+          longitude,
+          recorded_at: now,
+          speed: 0
+        }]);
+      if (insertError) throw insertError;
+
+      toast({ title: "✅ Mission démarrée", description: "Le statut a été mis à jour et la première position enregistrée." });
       await fetchMissions();
     } catch (err) {
-      toast({ title: "Erreur", description: err.message, variant: "destructive" });
+      toast({ title: "❌ Erreur", description: err.message, variant: "destructive" });
     } finally {
       setLoading(false);
     }
