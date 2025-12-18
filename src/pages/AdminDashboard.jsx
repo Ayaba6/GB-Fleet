@@ -80,12 +80,8 @@ const StatCard = ({ title, value, icon: Icon, color, onClick, blink = false }) =
           blink ? "text-red-600 dark:text-red-400" : scheme.text
         } group-hover:rotate-6 transition-transform`}
       />
-      <h3 className={`font-semibold text-lg mb-1 ${scheme.text}`}>
-        {title}
-      </h3>
-      <p className={`text-3xl font-extrabold ${scheme.text}`}>
-        {value}
-      </p>
+      <h3 className={`font-semibold text-lg mb-1 ${scheme.text}`}>{title}</h3>
+      <p className={`text-3xl font-extrabold ${scheme.text}`}>{value}</p>
     </button>
   );
 };
@@ -131,7 +127,6 @@ export default function AdminDashboard() {
   // FETCH DASHBOARD DATA
   const fetchData = useCallback(async () => {
     setLoading(true);
-
     try {
       const { data: { user: authUser } } = await supabase.auth.getUser();
       if (!authUser) return navigate("/login");
@@ -153,25 +148,22 @@ export default function AdminDashboard() {
         avatar: profile.avatar_url
       });
 
+      // Fetch initial stats
       const [
         usersRes,
         camionsRes,
         missionsBaticomRes,
         missionsGtsRes,
-        pannesRes,
         panneEnCoursRes
       ] = await Promise.all([
         supabase.from("profiles").select("id", { count: "exact", head: true }),
         supabase.from("camions").select("*"),
         supabase.from("journee_baticom").select("id", { count: "exact", head: true }),
         supabase.from("missions_gts").select("id", { count: "exact", head: true }),
-        supabase.from("alertespannes").select("id", { count: "exact", head: true }),
         supabase.from("alertespannes").select("id").eq("statut", "en_cours")
       ]);
 
-      const totalMissions =
-        (missionsBaticomRes.count || 0) +
-        (missionsGtsRes.count || 0);
+      const totalMissions = (missionsBaticomRes.count || 0) + (missionsGtsRes.count || 0);
 
       // --- Calcul documents urgents ---
       const today = new Date();
@@ -209,12 +201,57 @@ export default function AdminDashboard() {
     } catch (e) {
       console.error("Erreur fetch dashboard:", e);
     }
-
     setLoading(false);
   }, [navigate]);
 
   useEffect(() => {
     fetchData();
+  }, [fetchData]);
+
+  // --- Supabase Realtime pour pannes ---
+  useEffect(() => {
+    const channel = supabase
+      .channel("pannes-dashboard")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "alertespannes" },
+        async () => {
+          // Recalculate pannes en cours
+          const { data: pannesEnCours } = await supabase
+            .from("alertespannes")
+            .select("id")
+            .eq("statut", "en_cours");
+
+          setStats(prev => ({ ...prev, pannes: pannesEnCours?.length || 0 }));
+          setHasPanneEnCours((pannesEnCours?.length || 0) > 0);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      if (channel) supabase.removeChannel(channel);
+    };
+  }, []);
+
+  // --- Supabase Realtime pour documents urgents ---
+  useEffect(() => {
+    const channelDocs = supabase
+      .channel("docs-dashboard")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "profiles" },
+        fetchData
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "camions" },
+        fetchData
+      )
+      .subscribe();
+
+    return () => {
+      if (channelDocs) supabase.removeChannel(channelDocs);
+    };
   }, [fetchData]);
 
   const handleLogout = async () => {
