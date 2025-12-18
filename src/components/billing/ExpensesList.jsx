@@ -1,13 +1,8 @@
 import React, { useState } from "react";
 import { supabase } from "../../config/supabaseClient.js";
 import { 
-  Trash2, 
-  Search, 
-  Filter, 
-  Calendar as CalendarIcon, 
-  Truck as TruckIcon,
-  CreditCard,
-  ChevronRight
+  Trash2, Search, Filter, Truck as TruckIcon, 
+  Landmark, Receipt, ArrowUpDown
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 
@@ -15,136 +10,134 @@ export default function ExpensesList({ expenses, camions, refresh }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStructure, setFilterStructure] = useState("TOUS");
 
-  // Fonction pour supprimer une dépense
   const handleDelete = async (id) => {
-    if (!window.confirm("Êtes-vous sûr de vouloir supprimer cette dépense ?")) return;
-
+    if (!window.confirm("Confirmer la suppression de cette pièce ?")) return;
     const { error } = await supabase.from("expenses").delete().eq("id", id);
-    if (error) {
-      toast.error("Erreur lors de la suppression");
-    } else {
-      toast.success("Dépense supprimée");
-      refresh();
-    }
+    if (error) toast.error("Erreur système");
+    else { toast.success("Enregistrement supprimé"); refresh(); }
   };
 
-  // Filtrage combiné (Recherche + Structure)
   const filteredExpenses = expenses.filter((exp) => {
     const camion = camions.find((c) => c.id === exp.camion_id);
     const immat = camion?.immatriculation?.toLowerCase() || "";
     const desc = exp.description?.toLowerCase() || "";
     const matchesSearch = immat.includes(searchTerm.toLowerCase()) || desc.includes(searchTerm.toLowerCase());
     const matchesStructure = filterStructure === "TOUS" || exp.structure === filterStructure;
-    
     return matchesSearch && matchesStructure;
   });
 
   return (
-    <div className="flex flex-col h-full bg-white dark:bg-gray-800 transition-colors">
+    <div className="flex flex-col h-full bg-[#f8fafc] dark:bg-[#0f172a] transition-all duration-500 font-serif" 
+         style={{ fontFamily: "'Times New Roman', Times, serif" }}>
       
-      {/* --- BARRE DE RECHERCHE ET FILTRES --- */}
-      <div className="p-4 border-b border-gray-100 dark:border-gray-700 flex flex-col md:flex-row gap-4 items-center justify-between">
-        <div className="relative w-full md:w-96">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-          <input
-            type="text"
-            placeholder="Rechercher par camion ou description..."
-            className="w-full pl-10 pr-4 py-2 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-800 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 transition"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+      {/* --- HEADER --- */}
+      <div className="p-5 border-b border-blue-100 dark:border-slate-800 flex flex-col lg:flex-row gap-4 items-center justify-between bg-white dark:bg-[#1e293b] shadow-sm">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-blue-900 dark:bg-amber-600 rounded-lg shadow-inner">
+            <Receipt size={20} className="text-white" />
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100 italic">Journal des Écritures</h2>
+            <div className="h-0.5 w-12 bg-blue-600 dark:bg-amber-500 mt-1"></div>
+          </div>
         </div>
 
-        <div className="flex items-center gap-2 w-full md:w-auto">
-          <Filter size={18} className="text-gray-400" />
+        <div className="flex flex-wrap gap-3 w-full lg:w-auto">
+          <div className="relative group flex-1 min-w-[200px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-600 transition-colors" size={14} />
+            <input
+              type="text"
+              placeholder="Rechercher..."
+              className="w-full pl-9 pr-4 py-1.5 text-sm bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-full outline-none focus:ring-2 focus:ring-blue-500/20 dark:focus:ring-amber-500/20 transition-all italic text-slate-700 dark:text-slate-200"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+
           <select
             value={filterStructure}
             onChange={(e) => setFilterStructure(e.target.value)}
-            className="flex-1 md:w-40 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-700 dark:text-gray-200"
+            className="text-xs font-bold bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-4 py-1.5 rounded-full text-slate-600 dark:text-slate-300 uppercase tracking-tighter cursor-pointer hover:bg-slate-50 transition-colors"
           >
-            <option value="TOUS">Toutes les structures</option>
-            <option value="GTS">GTS</option>
-            <option value="BATICOM">BATICOM</option>
+            <option value="TOUS">Toutes Structures</option>
+            <option value="GTS">GTS Global</option>
+            <option value="BATICOM">Baticom Logistique</option>
           </select>
         </div>
       </div>
 
       {/* --- TABLEAU --- */}
-      <div className="overflow-x-auto">
-        <table className="w-full text-left border-collapse">
+      <div className="overflow-x-auto px-4 py-2">
+        <table className="w-full border-separate border-spacing-y-2">
           <thead>
-            <tr className="bg-gray-50 dark:bg-gray-900/50 text-gray-500 dark:text-gray-400 text-xs uppercase tracking-widest">
-              <th className="px-6 py-4 font-semibold">Date & Structure</th>
-              <th className="px-6 py-4 font-semibold">Camion</th>
-              <th className="px-6 py-4 font-semibold">Description</th>
-              <th className="px-6 py-4 font-semibold text-right">Montant</th>
-              <th className="px-6 py-4 font-semibold text-center">Actions</th>
+            <tr className="text-slate-400 dark:text-slate-500">
+              <th className="px-4 py-2 text-[10px] uppercase tracking-[0.2em] font-bold text-left">Date</th>
+              <th className="px-4 py-2 text-[10px] uppercase tracking-[0.2em] font-bold text-left">Entité</th>
+              <th className="px-4 py-2 text-[10px] uppercase tracking-[0.2em] font-bold text-left">Camion</th>
+              <th className="px-4 py-2 text-[10px] uppercase tracking-[0.2em] font-bold text-left">Désignation</th>
+              <th className="px-4 py-2 text-[10px] uppercase tracking-[0.2em] font-bold text-right">Montant</th>
+              <th className="px-4 py-2 text-[10px] uppercase tracking-[0.2em] font-bold text-center">Action</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-            {filteredExpenses.length > 0 ? (
-              filteredExpenses.map((exp) => {
-                const camion = camions.find((c) => c.id === exp.camion_id);
-                return (
-                  <tr key={exp.id} className="group hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
-                    <td className="px-6 py-4">
-                      <div className="flex flex-col">
-                        <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                          {new Date(exp.date).toLocaleDateString("fr-FR", { day: '2-digit', month: 'short', year: 'numeric' })}
-                        </span>
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full w-fit mt-1 ${
-                          exp.structure === 'GTS' 
-                          ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400' 
-                          : 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400'
-                        }`}>
-                          {exp.structure}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 bg-gray-100 dark:bg-gray-700 rounded-lg text-gray-500 dark:text-gray-400 group-hover:bg-white dark:group-hover:bg-gray-600 transition">
-                          <TruckIcon size={18} />
-                        </div>
-                        <span className="font-bold text-gray-700 dark:text-gray-200">
-                          {camion?.immatriculation || "Inconnu"}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400 max-w-xs truncate">
-                      {exp.description}
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <span className="text-lg font-black text-gray-900 dark:text-white">
-                        {exp.amount?.toLocaleString()} <small className="text-[10px] ml-0.5">FCFA</small>
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex justify-center">
-                        <button
-                          onClick={() => handleDelete(exp.id)}
-                          className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full transition"
-                          title="Supprimer"
-                        >
-                          <Trash2 size={18} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })
-            ) : (
-              <tr>
-                <td colSpan="5" className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
-                  <div className="flex flex-col items-center gap-2">
-                    <CreditCard size={48} className="opacity-20" />
-                    <p>Aucune dépense trouvée</p>
-                  </div>
-                </td>
-              </tr>
-            )}
+          <tbody>
+            {filteredExpenses.map((exp) => {
+              const camion = camions.find((c) => c.id === exp.camion_id);
+              const isGts = exp.structure === 'GTS';
+              
+              return (
+                <tr key={exp.id} className="bg-white dark:bg-[#1e293b] hover:shadow-md dark:hover:bg-[#25334a] transition-all group rounded-xl overflow-hidden shadow-sm border border-transparent dark:border-slate-800">
+                  <td className="px-4 py-3 text-xs tabular-nums text-slate-500 dark:text-slate-400 border-l-4 border-blue-500 dark:border-amber-600 rounded-l-lg">
+                    {exp.date}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className={`px-2 py-0.5 text-[10px] font-bold rounded shadow-sm ${
+                      isGts 
+                      ? 'bg-blue-900 text-white' 
+                      : 'bg-emerald-800 text-white'
+                    }`}>
+                      {exp.structure}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-sm font-bold text-slate-700 dark:text-slate-100 uppercase">
+                    {camion?.immatriculation || "---"}
+                  </td>
+                  <td className="px-4 py-3 text-xs italic text-slate-600 dark:text-slate-400 max-w-[200px] truncate">
+                    {exp.description}
+                  </td>
+                  <td className="px-4 py-3 text-right tabular-nums font-black text-base text-blue-900 dark:text-amber-500">
+                    {Number(exp.amount).toLocaleString()} <span className="text-[10px] font-normal opacity-60 ml-1">FCFA</span>
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    <button
+                      onClick={() => handleDelete(exp.id)}
+                      className="p-1.5 text-slate-300 hover:text-red-500 dark:text-slate-600 dark:hover:text-red-400 transition-colors bg-slate-50 dark:bg-slate-900 rounded-md"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
+      </div>
+
+      {/* --- FOOTER --- */}
+      <div className="mt-auto p-6 bg-white dark:bg-[#1e293b] border-t border-blue-50 dark:border-slate-800 flex justify-between items-center shadow-inner">
+        <div className="flex gap-2">
+           <div className="flex items-center gap-1 text-[10px] uppercase font-bold text-slate-400">
+             <div className="w-2 h-2 rounded-full bg-blue-900"></div> GTS
+           </div>
+           <div className="flex items-center gap-1 text-[10px] uppercase font-bold text-slate-400 ml-3">
+             <div className="w-2 h-2 rounded-full bg-emerald-800"></div> BATICOM
+           </div>
+        </div>
+        <div className="text-right">
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Balance Totale de la Sélection</p>
+          <p className="text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight">
+             {filteredExpenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0).toLocaleString()} <small className="text-xs">FCFA</small>
+          </p>
+        </div>
       </div>
     </div>
   );
