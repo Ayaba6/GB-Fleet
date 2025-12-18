@@ -10,13 +10,13 @@ import {
   MessageSquare, Wrench, Route, CheckCircle, Scale
 } from "lucide-react";
 
-// Modals
+// Imports des composants spécifiques GTS
 import IncidentModalGTS from "../components/modals/IncidentModalGTS.jsx";
 import NewMissionModalGTS from "../components/modals/NewMissionModalGTS.jsx";
 import HistoriqueGTS from "../components/HistoriqueGTS.jsx";
 import DeclarePanneModal from "../components/modals/DeclarePanneModal.jsx";
 
-// --- Utils
+// --- Utilitaire pour formatage des dates/heures ---
 const formatDateTime = (isoDate, timeOnly = false) => {
   if (!isoDate) return "N/A";
   const date = new Date(isoDate);
@@ -24,8 +24,11 @@ const formatDateTime = (isoDate, timeOnly = false) => {
   return date.toLocaleDateString('fr-FR');
 };
 
-// --- Header
-const DashboardHeaderGTS = ({ session, darkMode, setDarkMode, handleSignOut, openProfileMenu, setOpenProfileMenu, profileMenuRef }) => {
+// --- Header fixe ---
+const DashboardHeaderGTS = ({
+  session, darkMode, setDarkMode, handleSignOut,
+  openProfileMenu, setOpenProfileMenu, profileMenuRef,
+}) => {
   const userName = session?.user?.email?.split("@")[0] || "Chauffeur";
 
   return (
@@ -68,7 +71,7 @@ const DashboardHeaderGTS = ({ session, darkMode, setDarkMode, handleSignOut, ope
   );
 };
 
-// --- Bottom Navigation
+// --- Bottom Navigation ---
 const BottomNavigationGTS = ({ activeTab, setActiveTab }) => {
   const navItems = [
     { id: "dashboard", icon: Home, label: "Accueil" },
@@ -100,18 +103,33 @@ const BottomNavigationGTS = ({ activeTab, setActiveTab }) => {
   );
 };
 
-// --- Dashboard Content
-const DashboardContentGTS = ({ activeMission, handleNavigation, handleSignalEntry, setShowIncidentModal, setShowNewMissionModal, setPanneDialog, handleStartMission }) => {
+// --- Dashboard Content (Mission Active) ---
+const DashboardContentGTS = ({
+  activeMission, handleNavigation, handleSignalEntry,
+  setShowIncidentModal, setShowNewMissionModal, setPanneDialog,
+  handleStartMission,
+}) => {
   const statutMission = activeMission?.statut || "N/A";
 
   let statusBadge;
   switch (statutMission) {
-    case "Terminée": statusBadge = <span className="px-3 py-1 text-sm font-semibold rounded-full bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300">Terminée</span>; break;
-    case "En Cours": statusBadge = <span className="px-3 py-1 text-sm font-semibold rounded-full bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300">En Cours</span>; break;
-    case "Affectée": statusBadge = <span className="px-3 py-1 text-sm font-semibold rounded-full bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300">Affectée</span>; break;
-    case "En Chargement": statusBadge = <span className="px-3 py-1 text-sm font-semibold rounded-full bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300">En Chargement</span>; break;
-    case "En Déchargement": statusBadge = <span className="px-3 py-1 text-sm font-semibold rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300">En Déchargement</span>; break;
-    default: statusBadge = <span className="px-3 py-1 text-sm font-semibold rounded-full bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300">Disponible</span>;
+    case "Terminée":
+      statusBadge = <span className="px-3 py-1 text-sm font-semibold rounded-full bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300">Terminée</span>;
+      break;
+    case "En Cours":
+      statusBadge = <span className="px-3 py-1 text-sm font-semibold rounded-full bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300">En Cours</span>;
+      break;
+    case "Affectée":
+      statusBadge = <span className="px-3 py-1 text-sm font-semibold rounded-full bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300">Affectée</span>;
+      break;
+    case "En Chargement":
+      statusBadge = <span className="px-3 py-1 text-sm font-semibold rounded-full bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300">En Chargement</span>;
+      break;
+    case "En Déchargement":
+      statusBadge = <span className="px-3 py-1 text-sm font-semibold rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300">En Déchargement</span>;
+      break;
+    default:
+      statusBadge = <span className="px-3 py-1 text-sm font-semibold rounded-full bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300">Disponible</span>;
   }
 
   const DetailItem = ({ icon: Icon, label, value, type = "text" }) => (
@@ -200,7 +218,7 @@ const DashboardContentGTS = ({ activeMission, handleNavigation, handleSignalEntr
   );
 };
 
-// --- Main Component ---
+// --- Composant Principal ---
 export default function ChauffeurDashboardGTS({ session }) {
   const navigate = useNavigate();
   const chauffeurId = session?.user?.id;
@@ -220,11 +238,6 @@ export default function ChauffeurDashboardGTS({ session }) {
   const [openProfileMenu, setOpenProfileMenu] = useState(false);
   const profileMenuRef = useRef();
 
-  // --- Audio Notification ---
-  const notificationAudio = useRef(new Audio("/notification.mp3")); // mettre le fichier mp3 dans public/
-
-  const prevMissionRef = useRef(null); // Pour détecter nouvelles missions
-
   useEffect(() => { document.documentElement.classList.toggle("dark", darkMode); }, [darkMode]);
   useEffect(() => {
     const handleClickOutside = (event) => { if (profileMenuRef.current && !profileMenuRef.current.contains(event.target)) setOpenProfileMenu(false); };
@@ -232,7 +245,6 @@ export default function ChauffeurDashboardGTS({ session }) {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // --- Fetch Missions ---
   const fetchMissions = useCallback(async () => {
     if (!chauffeurId) return navigate("/login");
     setLoading(true);
@@ -259,7 +271,6 @@ export default function ChauffeurDashboardGTS({ session }) {
     } finally { setLoading(false); }
   }, [chauffeurId, navigate, toast]);
 
-  // --- Realtime Listening ---
   useEffect(() => {
     fetchMissions();
     const channel = supabase
@@ -269,31 +280,23 @@ export default function ChauffeurDashboardGTS({ session }) {
     return () => { if (channel) supabase.removeChannel(channel); };
   }, [chauffeurId, fetchMissions]);
 
-  // --- Audio Notification sur mission affectée ---
-  useEffect(() => {
-    if (activeMission && activeMission.statut === "Affectée") {
-      const wasPreviouslyAffectee = prevMissionRef.current?.id === activeMission.id &&
-                                    prevMissionRef.current?.statut === "Affectée";
-      if (!wasPreviouslyAffectee) {
-        notificationAudio.current.play().catch(err => console.log("Erreur audio :", err));
-        toast({ title: "Nouvelle mission affectée !", description: activeMission.titre || "Mission GTS", variant: "default" });
-      }
-    }
-    prevMissionRef.current = activeMission;
-  }, [activeMission, toast]);
-
   // --- Déconnexion ---
   const handleSignOut = async () => {
     try {
-      const { error } = await supabase.auth.signOut();
+      const { error } = await supabase.auth.signOut({ scope: "local" });
       if (error) throw error;
       navigate("/login");
     } catch (err) {
-      toast({ title: "Erreur déconnexion", description: err.message, variant: "destructive" });
+      try {
+        const { error: e2 } = await supabase.auth.signOut();
+        if (e2) throw e2;
+        navigate("/login");
+      } catch (err2) {
+        toast({ title: "Erreur déconnexion", description: (err2?.message || err.message), variant: "destructive" });
+      }
     }
   };
 
-  // --- Navigation Google Maps ---
   const handleNavigation = (mission) => {
     const url = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(mission.destination || "destination")}`;
     window.open(url, "_blank");
@@ -329,7 +332,7 @@ export default function ChauffeurDashboardGTS({ session }) {
     }
   };
 
-  // --- Démarrer mission ---
+  // --- Démarrage mission avec insertion position GPS ---
   const handleStartMission = async (mission) => {
     try {
       setLoading(true);
