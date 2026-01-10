@@ -68,29 +68,53 @@ export default function InvoiceForm({ isOpen, onClose, refresh }) {
   }, [clientId, clients]);
 
   // --- Générer numéro de facture automatique ---
-  useEffect(() => {
-    if (!isOpen) return;
-    const generateNumber = async () => {
-      try {
-        const { data, error } = await supabase
-          .from("invoices")
-          .select("id")
-          .order("id", { ascending: false })
-          .limit(1)
-          .single();
-        if (error && error.code !== "PGRST116") throw error;
-        const lastId = data?.id || 0;
-        const nextId = lastId + 1;
-        const padded = String(nextId).padStart(3, "0");
-        const year = new Date().getFullYear();
-        const number = `N${padded}-01/BAT/${year}`;
-        setInvoiceNumber(number);
-      } catch (err) {
-        toast({ title: "Erreur", description: "Impossible de générer le numéro de facture", variant: "destructive" });
+useEffect(() => {
+  if (!isOpen) return;
+
+  const generateNumber = async () => {
+    try {
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, "0");
+
+      // Exemple recherché : -02/BAT/2026
+      const monthlyPattern = `-${month}/BAT/${year}`;
+
+      const { data, error } = await supabase
+        .from("invoices")
+        .select("invoice_number")
+        .like("invoice_number", `%${monthlyPattern}`)
+        .order("invoice_number", { ascending: false })
+        .limit(1);
+
+      let nextNumber = 1;
+
+      if (data && data.length > 0 && data[0].invoice_number) {
+        // Exemple : N012-02/BAT/2026
+        const match = data[0].invoice_number.match(/^N(\d+)-/);
+        if (match) {
+          nextNumber = parseInt(match[1], 10) + 1;
+        }
       }
-    };
-    generateNumber();
-  }, [isOpen]);
+
+      const padded = String(nextNumber).padStart(3, "0");
+      const number = `N${padded}-${month}/BAT/${year}`;
+
+      setInvoiceNumber(number);
+    } catch (err) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de générer le numéro de facture",
+        variant: "destructive",
+      });
+    }
+  };
+
+  generateNumber();
+}, [isOpen]);
+
+
+
 
   // --- Génération PDF automatique ---
   useEffect(() => {

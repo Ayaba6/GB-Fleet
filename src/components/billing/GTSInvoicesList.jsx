@@ -1,12 +1,13 @@
 // src/components/billing/GTSInvoicesList.jsx
-import React from "react";
-import { PencilSquareIcon, TrashIcon, PrinterIcon } from "@heroicons/react/24/outline";
+import React, { useState } from "react";
+import { PencilSquareIcon, TrashIcon, PrinterIcon, EyeIcon } from "@heroicons/react/24/outline";
 import { supabase } from "../../config/supabaseClient.js";
 import { useToast } from "../ui/use-toast.jsx";
 import { generateInvoicePDFGTS } from "./InvoiceGeneratorGTS.jsx";
 
-export default function GTSInvoicesList({ invoices, onEdit, onDelete, emptyMessage }) {
+export default function GTSInvoicesList({ invoices, onEdit, refresh, emptyMessage }) {
   const { toast } = useToast();
+  const [previewUrl, setPreviewUrl] = useState(null);
 
   const handlePrint = async (invoice) => {
     try {
@@ -37,9 +38,10 @@ export default function GTSInvoicesList({ invoices, onEdit, onDelete, emptyMessa
         description: fullInvoice.description,
         summaryData: fullInvoice.summary_data || [],
         itemsData: fullInvoice.items_data || [],
-        periode: fullInvoice.periode_debut && fullInvoice.periode_fin
-          ? `${new Date(fullInvoice.periode_debut).toLocaleDateString("fr-FR")} - ${new Date(fullInvoice.periode_fin).toLocaleDateString("fr-FR")}`
-          : "",
+        periode:
+          fullInvoice.periode_debut && fullInvoice.periode_fin
+            ? `${new Date(fullInvoice.periode_debut).toLocaleDateString("fr-FR")} - ${new Date(fullInvoice.periode_fin).toLocaleDateString("fr-FR")}`
+            : "",
         date_created: fullInvoice.date_created,
       };
 
@@ -47,6 +49,68 @@ export default function GTSInvoicesList({ invoices, onEdit, onDelete, emptyMessa
       doc.save(`${invoiceData.invoiceNumber || "facture-GTS"}.pdf`);
     } catch (err) {
       console.error("Erreur impression facture:", err);
+      toast({ title: "Erreur", description: err.message, variant: "destructive" });
+    }
+  };
+
+  const handlePreview = async (invoice) => {
+    try {
+      const { data: fullInvoice, error: invoiceError } = await supabase
+        .from("invoices_gts")
+        .select("*")
+        .eq("id", invoice.id)
+        .single();
+      if (invoiceError) throw invoiceError;
+
+      const { data: clientData, error: clientError } = await supabase
+        .from("clients_gts")
+        .select("*")
+        .eq("id", fullInvoice.client_id)
+        .single();
+      if (clientError) throw clientError;
+
+      const invoiceData = {
+        invoiceNumber: fullInvoice.invoice_number,
+        clientName: clientData.name,
+        clientAddress: clientData.address,
+        clientRCCM: clientData.rccm,
+        clientIFU: clientData.ifu,
+        clientTel: clientData.phone,
+        clientRegimeFiscal: clientData.regime_fiscal,
+        clientDivisionFiscale: clientData.division_fiscale,
+        clientZone: clientData.zone,
+        description: fullInvoice.description,
+        summaryData: fullInvoice.summary_data || [],
+        itemsData: fullInvoice.items_data || [],
+        periode:
+          fullInvoice.periode_debut && fullInvoice.periode_fin
+            ? `${new Date(fullInvoice.periode_debut).toLocaleDateString("fr-FR")} - ${new Date(fullInvoice.periode_fin).toLocaleDateString("fr-FR")}`
+            : "",
+        date_created: fullInvoice.date_created,
+      };
+
+      const doc = generateInvoicePDFGTS(invoiceData);
+      const blob = doc.output("blob");
+      const url = URL.createObjectURL(blob);
+      setPreviewUrl(url);
+      window.open(url, "_blank");
+    } catch (err) {
+      console.error("Erreur aperçu facture:", err);
+      toast({ title: "Erreur", description: err.message, variant: "destructive" });
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm("Voulez-vous vraiment supprimer cette facture ?")) return;
+    try {
+      const { error } = await supabase.from("invoices_gts").delete().eq("id", id);
+      if (error) throw error;
+
+      toast({ title: "Supprimé", description: "La facture a été supprimée.", variant: "success" });
+
+      if (refresh) refresh(); // 🔥 Actualisation de la liste
+    } catch (err) {
+      console.error("Erreur suppression facture:", err);
       toast({ title: "Erreur", description: err.message, variant: "destructive" });
     }
   };
@@ -105,11 +169,14 @@ export default function GTSInvoicesList({ invoices, onEdit, onDelete, emptyMessa
                       <button onClick={() => onEdit && onEdit(inv)} className="p-2 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/30 rounded-lg transition-colors" title="Modifier">
                         <PencilSquareIcon className="w-5 h-5" />
                       </button>
-                      <button onClick={() => onDelete && window.confirm("Supprimer ?") && onDelete(inv.id)} className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors" title="Supprimer">
+                      <button onClick={() => handleDelete(inv.id)} className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors" title="Supprimer">
                         <TrashIcon className="w-5 h-5" />
                       </button>
                       <button onClick={() => handlePrint(inv)} className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors" title="Imprimer">
                         <PrinterIcon className="w-5 h-5" />
+                      </button>
+                      <button onClick={() => handlePreview(inv)} className="p-2 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/30 rounded-lg transition-colors" title="Aperçu PDF">
+                        <EyeIcon className="w-5 h-5" />
                       </button>
                     </div>
                   </td>

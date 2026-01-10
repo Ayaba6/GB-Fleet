@@ -37,27 +37,47 @@ export default function GTSInvoiceForm({ isOpen, onClose, refresh }) {
 
   // --- Génération automatique du numéro de facture ---
   useEffect(() => {
-    if (!isOpen) return;
+  if (!isOpen) return;
 
-    const generateInvoiceNumber = async () => {
-      try {
-        const { data, error } = await supabase
-          .from("invoices_gts")
-          .select("id")
-          .order("id", { ascending: false })
-          .limit(1);
+  const generateInvoiceNumber = async () => {
+    try {
+      const year = new Date().getFullYear();
 
-        if (error) throw error;
-        const lastId = data?.[0]?.id || 0;
-        const year = new Date().getFullYear();
-        setInvoiceNumber(`N°${String(lastId + 1).padStart(2, "0")}/GTS/${year}`);
-      } catch (err) {
-        toast({ title: "Erreur", description: err.message, variant: "destructive" });
+      const { data, error } = await supabase
+        .from("invoices_gts")
+        .select("invoice_number")
+        .like("invoice_number", `%/GTS/${year}`)
+        .order("invoice_number", { ascending: false })
+        .limit(1);
+
+      if (error) throw error;
+
+      let nextNumber = 1;
+
+      if (data && data.length > 0 && data[0].invoice_number) {
+        // Exemple : N°09/GTS/2026
+        const match = data[0].invoice_number.match(/^N°(\d+)/);
+        if (match) {
+          nextNumber = parseInt(match[1], 10) + 1;
+        }
       }
-    };
 
-    generateInvoiceNumber();
-  }, [isOpen]);
+      const padded = String(nextNumber).padStart(2, "0");
+      const invoiceNumber = `N°${padded}/GTS/${year}`;
+
+      setInvoiceNumber(invoiceNumber);
+    } catch (err) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de générer le numéro de facture GTS",
+        variant: "destructive",
+      });
+    }
+  };
+
+  generateInvoiceNumber();
+}, [isOpen]);
+
 
   // --- Charger clients GTS ---
   useEffect(() => {
