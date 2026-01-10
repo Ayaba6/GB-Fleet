@@ -35,6 +35,30 @@ export default function GTSInvoiceForm({ isOpen, onClose, refresh }) {
 
   const [pdfBlobUrl, setPdfBlobUrl] = useState(null);
 
+  // --- Génération automatique du numéro de facture ---
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const generateInvoiceNumber = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("invoices_gts")
+          .select("id")
+          .order("id", { ascending: false })
+          .limit(1);
+
+        if (error) throw error;
+        const lastId = data?.[0]?.id || 0;
+        const year = new Date().getFullYear();
+        setInvoiceNumber(`N°${String(lastId + 1).padStart(2, "0")}/GTS/${year}`);
+      } catch (err) {
+        toast({ title: "Erreur", description: err.message, variant: "destructive" });
+      }
+    };
+
+    generateInvoiceNumber();
+  }, [isOpen]);
+
   // --- Charger clients GTS ---
   useEffect(() => {
     if (!isOpen) return;
@@ -72,44 +96,9 @@ export default function GTSInvoiceForm({ isOpen, onClose, refresh }) {
     }
   }, [clientId, clients]);
 
-  // --- Génération PDF automatique ---
-  useEffect(() => {
-    if (!isOpen) return;
-    if (invoiceNumber || clientName || summaryData.length) {
-      const invoiceData = {
-        invoiceNumber,
-        clientName,
-        clientAddress,
-        clientRCCM,
-        clientIFU,
-        clientTel,
-        clientRegimeFiscal,
-        clientDivisionFiscale,
-        clientZone,
-        description,
-        summaryData,
-      };
-      const doc = generateInvoicePDFGTS(invoiceData);
-      const pdfBlob = doc.output("blob");
-      setPdfBlobUrl(URL.createObjectURL(pdfBlob));
-    }
-  }, [
-    isOpen,
-    invoiceNumber,
-    clientName,
-    clientAddress,
-    clientRCCM,
-    clientIFU,
-    clientTel,
-    clientRegimeFiscal,
-    clientDivisionFiscale,
-    clientZone,
-    description,
-    summaryData,
-  ]);
-
   if (!isOpen) return null;
 
+  // --- Génération PDF au clic seulement ---
   const handleGeneratePDF = () => {
     const invoiceData = {
       invoiceNumber,
@@ -126,27 +115,52 @@ export default function GTSInvoiceForm({ isOpen, onClose, refresh }) {
     };
     const doc = generateInvoicePDFGTS(invoiceData);
     doc.save(`${invoiceNumber || "facture-GTS"}.pdf`);
+
+    const pdfBlob = doc.output("blob");
+    setPdfBlobUrl(URL.createObjectURL(pdfBlob));
   };
 
+  // =========================
+  // ✅ CORRECTION ICI
+  // =========================
   const handleSave = async () => {
     if (!clientId) {
       toast({ title: "Erreur", description: "Veuillez sélectionner un client", variant: "destructive" });
       return;
     }
+
     try {
-      const { error } = await supabase.from("invoices_gts").insert([{
-        client_id: clientId,
-        client_name: clientName,
-        description,
-        amount: summaryData.reduce((acc, s) => acc + Number(s.amount || 0), 0),
-        date_created: new Date().toISOString(),
-        status: "en_attente",
-        regime_fiscal: clientRegimeFiscal,
-        division_fiscale: clientDivisionFiscale,
-        zone: clientZone,
-      }]);
+      const { error } = await supabase.from("invoices_gts").insert([
+        {
+          client_id: clientId,
+          client_name: clientName,
+          description,
+
+          amount: summaryData.reduce(
+            (acc, s) => acc + Number(s.amount || 0),
+            0
+          ),
+
+          date_created: new Date().toISOString(),
+          status: "en_attente",
+          division_fiscale: clientDivisionFiscale,
+          regime_fiscal: clientRegimeFiscal,
+          zone: clientZone,
+          invoice_number: invoiceNumber,
+
+          // ✅ AJOUT CRITIQUE
+          summary_data: summaryData,
+          items_data: summaryData,
+        }
+      ]);
+
       if (error) throw error;
-      toast({ title: "Facture enregistrée", description: "La facture GTS a été sauvegardée avec succès." });
+
+      toast({
+        title: "Facture enregistrée",
+        description: "La facture GTS a été sauvegardée avec succès.",
+      });
+
       onClose();
       refresh();
     } catch (err) {
@@ -160,11 +174,10 @@ export default function GTSInvoiceForm({ isOpen, onClose, refresh }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex justify-center items-center z-50 p-4 transition-all duration-300">
+    <div className="fixed inset-0 bg-black/60 flex justify-center items-center z-50 p-4">
       <div className="bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-2xl shadow-2xl w-full max-w-4xl p-6 overflow-y-auto max-h-[90vh] border border-gray-200 dark:border-gray-700">
-
         {/* Header */}
-        <div className="flex justify-between items-center border-b border-gray-200 dark:border-gray-700 pb-3 mb-4">
+        <div className="flex justify-between items-center border-b pb-3 mb-4 border-gray-200 dark:border-gray-700">
           <h2 className="text-xl font-semibold flex items-center gap-2">
             <FileText className="text-blue-600" /> Nouvelle Facture GTS
           </h2>
@@ -175,8 +188,6 @@ export default function GTSInvoiceForm({ isOpen, onClose, refresh }) {
 
         {/* Formulaire */}
         <div className="space-y-5 overflow-y-auto max-h-[60vh] pr-2">
-
-          {/* Numéro de facture */}
           <input
             type="text"
             placeholder="Numéro facture"
@@ -193,12 +204,12 @@ export default function GTSInvoiceForm({ isOpen, onClose, refresh }) {
               className="flex-1 p-2 border rounded-md border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800"
             >
               <option value="">-- Sélectionner un client GTS --</option>
-              {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
             <Button onClick={() => setIsClientModalOpen(true)}>+ Nouveau</Button>
           </div>
 
-          {/* Champs client étendus */}
+          {/* Champs client */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <input type="text" placeholder="Adresse" value={clientAddress} onChange={e => setClientAddress(e.target.value)} className="p-2 border rounded-md w-full border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800"/>
             <input type="text" placeholder="RCCM" value={clientRCCM} onChange={e => setClientRCCM(e.target.value)} className="p-2 border rounded-md w-full border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800"/>
@@ -214,24 +225,42 @@ export default function GTSInvoiceForm({ isOpen, onClose, refresh }) {
 
           {/* Bouton résumé */}
           <div className="flex flex-wrap gap-3 pt-3">
-            <Button onClick={() => setIsSummaryModalOpen(true)} className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md transition">Remplir Tableau Résumé</Button>
+            <Button onClick={() => setIsSummaryModalOpen(true)} className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md transition">
+              Remplir Tableau Résumé
+            </Button>
           </div>
         </div>
 
         {/* Actions */}
         <div className="mt-6 flex justify-end gap-3 border-t border-gray-200 dark:border-gray-700 pt-4">
-          <Button onClick={handleGeneratePDF} className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-md shadow transition">Générer le PDF</Button>
-          <Button onClick={handleSave} className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-md shadow transition">Enregistrer</Button>
+          <Button onClick={handleGeneratePDF} className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-md shadow transition">
+            Générer le PDF
+          </Button>
+          <Button onClick={handleSave} className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-md shadow transition">
+            Enregistrer
+          </Button>
           {pdfBlobUrl && (
-            <a href={pdfBlobUrl} target="_blank" rel="noopener noreferrer" className="bg-gray-700 hover:bg-gray-800 text-white px-4 py-2 rounded-md shadow transition">
+            <a
+              href={pdfBlobUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="bg-gray-700 hover:bg-gray-800 text-white px-4 py-2 rounded-md shadow transition"
+            >
               Aperçu PDF
             </a>
           )}
         </div>
 
-        {/* Modals enfants */}
-        <SummaryTableModal isOpen={isSummaryModalOpen} onClose={() => setIsSummaryModalOpen(false)} onUpdate={setSummaryData}/>
-        <ClientFormModal isOpen={isClientModalOpen} onClose={() => setIsClientModalOpen(false)} onClientAdded={handleClientAdded}/>
+        <SummaryTableModal
+          isOpen={isSummaryModalOpen}
+          onClose={() => setIsSummaryModalOpen(false)}
+          onUpdate={setSummaryData}
+        />
+        <ClientFormModal
+          isOpen={isClientModalOpen}
+          onClose={() => setIsClientModalOpen(false)}
+          onClientAdded={handleClientAdded}
+        />
       </div>
     </div>
   );

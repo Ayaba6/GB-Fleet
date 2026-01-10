@@ -1,25 +1,24 @@
+// src/components/billing/GTSInvoicesList.jsx
 import React from "react";
 import { PencilSquareIcon, TrashIcon, PrinterIcon } from "@heroicons/react/24/outline";
 import { supabase } from "../../config/supabaseClient.js";
 import { useToast } from "../ui/use-toast.jsx";
-import { generateInvoicePDF } from "./InvoiceGenerator.jsx";
+import { generateInvoicePDFGTS } from "./InvoiceGeneratorGTS.jsx";
 
-export default function InvoicesList({ invoices, onEdit, onDelete, emptyMessage, type = "baticom" }) {
+export default function GTSInvoicesList({ invoices, onEdit, onDelete, emptyMessage }) {
   const { toast } = useToast();
 
   const handlePrint = async (invoice) => {
     try {
-      const tableName = type === "gts" ? "invoices_gts" : "invoices";
       const { data: fullInvoice, error: invoiceError } = await supabase
-        .from(tableName)
+        .from("invoices_gts")
         .select("*")
         .eq("id", invoice.id)
         .single();
       if (invoiceError) throw invoiceError;
 
-      const clientTable = type === "gts" ? "clients_gts" : "clients";
       const { data: clientData, error: clientError } = await supabase
-        .from(clientTable)
+        .from("clients_gts")
         .select("*")
         .eq("id", fullInvoice.client_id)
         .single();
@@ -32,6 +31,9 @@ export default function InvoicesList({ invoices, onEdit, onDelete, emptyMessage,
         clientRCCM: clientData.rccm,
         clientIFU: clientData.ifu,
         clientTel: clientData.phone,
+        clientRegimeFiscal: clientData.regime_fiscal,
+        clientDivisionFiscale: clientData.division_fiscale,
+        clientZone: clientData.zone,
         description: fullInvoice.description,
         summaryData: fullInvoice.summary_data || [],
         itemsData: fullInvoice.items_data || [],
@@ -41,9 +43,8 @@ export default function InvoicesList({ invoices, onEdit, onDelete, emptyMessage,
         date_created: fullInvoice.date_created,
       };
 
-      const doc = generateInvoicePDF(invoiceData);
-      doc.save(`${invoiceData.invoiceNumber || "facture"}.pdf`);
-
+      const doc = generateInvoicePDFGTS(invoiceData);
+      doc.save(`${invoiceData.invoiceNumber || "facture-GTS"}.pdf`);
     } catch (err) {
       console.error("Erreur impression facture:", err);
       toast({ title: "Erreur", description: err.message, variant: "destructive" });
@@ -74,45 +75,47 @@ export default function InvoicesList({ invoices, onEdit, onDelete, emptyMessage,
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200 dark:divide-slate-700">
-            {invoices.map((inv) => (
-              <tr key={inv.id} className="group hover:bg-blue-50/30 dark:hover:bg-slate-700/30 transition-colors duration-150">
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <span className="font-mono text-sm font-bold text-blue-600 dark:text-blue-400">
-                    {inv.invoice_number || `#${inv.id.toString().slice(0, 5)}`}
-                  </span>
-                </td>
-                <td className="px-6 py-4">
-                  <div className="text-sm font-medium text-gray-900 dark:text-slate-100">{inv.client_name}</div>
-                </td>
-                <td className="px-6 py-4">
-                  <div className="text-sm font-semibold text-gray-900 dark:text-slate-100">
-                    {Number(inv.amount).toLocaleString("fr-FR")} <span className="text-[10px] text-gray-500">XOF</span>
-                  </div>
-                </td>
-                <td className="px-6 py-4">
-                  <div className="text-sm text-gray-600 dark:text-slate-400">
-                    {inv.date_created ? new Date(inv.date_created).toLocaleDateString("fr-FR") : "-"}
-                  </div>
-                </td>
-                <td className="px-6 py-4">
-                  <div className="flex justify-center items-center gap-3">
-                    {onEdit && (
-                      <button onClick={() => onEdit(inv)} className="p-2 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/30 rounded-lg transition-colors" title="Modifier">
+            {invoices.map((inv) => {
+              const totalAmount = inv.summary_data && inv.summary_data.length > 0
+                ? inv.summary_data.reduce((acc, item) => acc + Number(item.montantNet || 0), 0)
+                : Number(inv.amount || 0);
+
+              return (
+                <tr key={inv.id} className="group hover:bg-blue-50/30 dark:hover:bg-slate-700/30 transition-colors duration-150">
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className="font-mono text-sm font-bold text-blue-600 dark:text-blue-400">
+                      {inv.invoice_number || `#${inv.id.toString().slice(0, 5)}`}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="text-sm font-medium text-gray-900 dark:text-slate-100">{inv.client_name}</div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="text-sm font-semibold text-gray-900 dark:text-slate-100">
+                      {totalAmount.toLocaleString("fr-FR")} <span className="text-[10px] text-gray-500">XOF</span>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="text-sm text-gray-600 dark:text-slate-400">
+                      {inv.date_created ? new Date(inv.date_created).toLocaleDateString("fr-FR") : "-"}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex justify-center items-center gap-3">
+                      <button onClick={() => onEdit && onEdit(inv)} className="p-2 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/30 rounded-lg transition-colors" title="Modifier">
                         <PencilSquareIcon className="w-5 h-5" />
                       </button>
-                    )}
-                    {onDelete && (
-                      <button onClick={() => window.confirm("Supprimer ?") && onDelete(inv.id)} className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors" title="Supprimer">
+                      <button onClick={() => onDelete && window.confirm("Supprimer ?") && onDelete(inv.id)} className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors" title="Supprimer">
                         <TrashIcon className="w-5 h-5" />
                       </button>
-                    )}
-                    <button onClick={() => handlePrint(inv)} className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors" title="Imprimer">
-                      <PrinterIcon className="w-5 h-5" />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
+                      <button onClick={() => handlePrint(inv)} className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors" title="Imprimer">
+                        <PrinterIcon className="w-5 h-5" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

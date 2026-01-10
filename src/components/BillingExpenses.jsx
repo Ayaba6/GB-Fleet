@@ -1,13 +1,12 @@
-// src/pages/BillingExpenses.js
 import React, { useEffect, useState } from "react";
 import Tabs from "../components/ui/tabs.jsx";
 import { supabase } from "../config/supabaseClient.js";
 import InvoicesList from "../components/billing/InvoicesList.jsx";
-import GTSInvoicesList from "../components/billing/InvoicesList.jsx";
+import GTSInvoicesList from "../components/billing/GTSInvoicesList.jsx";
 import ExpensesList from "../components/billing/ExpensesList.jsx";
 import FinanceChart from "../components/billing/FinanceChart.jsx";
-import InvoiceForm from "../components/billing/InvoiceFormContainer.jsx"; // BATICOM
-import GTSInvoiceForm from "../components/billing/GTSInvoiceForm.jsx"; // GTS
+import InvoiceForm from "../components/billing/InvoiceFormContainer.jsx";
+import GTSInvoiceForm from "../components/billing/GTSInvoiceForm.jsx";
 import ExpenseForm from "../components/billing/ExpenseForm.jsx";
 import { DollarSign, TrendingUp, TrendingDown, LayoutDashboard, Plus } from "lucide-react";
 import { Button } from "../components/ui/button.jsx";
@@ -26,12 +25,19 @@ export default function BillingExpenses() {
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
   const [isGTSInvoiceModalOpen, setIsGTSInvoiceModalOpen] = useState(false);
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
+  const [editingInvoice, setEditingInvoice] = useState(null);
+  const [editingGTSInvoice, setEditingGTSInvoice] = useState(null);
 
   // --- Chargement des données ---
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [ { data: invB }, { data: invG }, { data: exp }, { data: veh } ] = await Promise.all([
+      const [
+        { data: invB },
+        { data: invG },
+        { data: exp },
+        { data: veh },
+      ] = await Promise.all([
         supabase.from("invoices").select("*"),
         supabase.from("invoices_gts").select("*"),
         supabase.from("expenses").select("*"),
@@ -43,8 +49,9 @@ export default function BillingExpenses() {
       setExpenses(exp || []);
       setCamions(veh || []);
 
-      const totalInvoices = (invB || []).reduce((acc, f) => acc + Number(f?.amount || 0), 0)
-                         + (invG || []).reduce((acc, f) => acc + Number(f?.amount || 0), 0);
+      const totalInvoices =
+        (invB || []).reduce((acc, f) => acc + Number(f?.amount || 0), 0) +
+        (invG || []).reduce((acc, f) => acc + Number(f?.amount || 0), 0);
       const totalExpenses = (exp || []).reduce((acc, d) => acc + Number(d?.amount || 0), 0);
 
       setTotals({
@@ -125,31 +132,49 @@ export default function BillingExpenses() {
         {loading ? <p>Chargement...</p> : <FinanceChart invoices={[...baticomInvoices, ...gtsInvoices]} expenses={expenses} />}
       </div>
 
-      {/* Tabs Factures / Dépense */}
+      {/* Tabs Factures / Dépenses */}
       <Tabs
-        defaultValue="invoices"
+        defaultValue="baticom"
         tabs={[
           {
             label: "Factures BATICOM",
             value: "baticom",
-            content: loading ? <p>Chargement...</p> : <InvoicesList invoices={baticomInvoices} refresh={fetchData} />
+            content: <InvoicesList
+              invoices={baticomInvoices}
+              type="baticom"
+              onEdit={(inv) => { setEditingInvoice(inv); setIsInvoiceModalOpen(true); }}
+              onDelete={async (id) => {
+                await supabase.from("invoices").delete().eq("id", id);
+                fetchData();
+              }}
+              emptyMessage="Aucune facture BATICOM pour le moment."
+            />,
           },
           {
             label: "Factures GTS",
             value: "gts",
-            content: loading ? <p>Chargement...</p> : <GTSInvoicesList invoices={gtsInvoices} refresh={fetchData} />
+            content: <GTSInvoicesList
+              invoices={gtsInvoices}
+              onEdit={(inv) => { setEditingGTSInvoice(inv); setIsGTSInvoiceModalOpen(true); }}
+              refresh={fetchData}
+            />,
           },
           {
             label: "Dépenses",
             value: "expenses",
-            content: loading ? <p>Chargement...</p> : <ExpensesList expenses={expenses} refresh={fetchData} camions={camions} />
+            content: <ExpensesList
+              expenses={expenses}
+              camions={camions}
+              refresh={fetchData}
+              emptyMessage="Aucune dépense enregistrée."
+            />,
           },
         ]}
       />
 
       {/* Modals */}
-      <InvoiceForm isOpen={isInvoiceModalOpen} onClose={() => setIsInvoiceModalOpen(false)} refresh={fetchData} />
-      <GTSInvoiceForm isOpen={isGTSInvoiceModalOpen} onClose={() => setIsGTSInvoiceModalOpen(false)} refresh={fetchData} />
+      <InvoiceForm isOpen={isInvoiceModalOpen} onClose={() => setIsInvoiceModalOpen(false)} refresh={fetchData} initialData={editingInvoice} />
+      <GTSInvoiceForm isOpen={isGTSInvoiceModalOpen} onClose={() => setIsGTSInvoiceModalOpen(false)} refresh={fetchData} initialData={editingGTSInvoice} />
       <ExpenseForm isOpen={isExpenseModalOpen} onClose={() => setIsExpenseModalOpen(false)} refresh={fetchData} camions={camions} />
     </div>
   );

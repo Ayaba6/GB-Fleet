@@ -14,7 +14,7 @@ export default function InvoiceForm({ isOpen, onClose, refresh }) {
 
   // --- Facture ---
   const [invoiceNumber, setInvoiceNumber] = useState("");
-  const [description, setDescription] = useState(""); // colonne description
+  const [description, setDescription] = useState("");
 
   // --- Client ---
   const [clientId, setClientId] = useState(null);
@@ -66,6 +66,31 @@ export default function InvoiceForm({ isOpen, onClose, refresh }) {
       setClientTel(client.phone || "");
     }
   }, [clientId, clients]);
+
+  // --- Générer numéro de facture automatique ---
+  useEffect(() => {
+    if (!isOpen) return;
+    const generateNumber = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("invoices")
+          .select("id")
+          .order("id", { ascending: false })
+          .limit(1)
+          .single();
+        if (error && error.code !== "PGRST116") throw error; // ignore "no rows"
+        const lastId = data?.id || 0;
+        const nextId = lastId + 1;
+        const padded = String(nextId).padStart(3, "0");
+        const year = new Date().getFullYear();
+        const number = `N${padded}-01/BAT/${year}`;
+        setInvoiceNumber(number);
+      } catch (err) {
+        toast({ title: "Erreur", description: "Impossible de générer le numéro de facture", variant: "destructive" });
+      }
+    };
+    generateNumber();
+  }, [isOpen]);
 
   // --- Génération PDF automatique ---
   useEffect(() => {
@@ -123,7 +148,7 @@ export default function InvoiceForm({ isOpen, onClose, refresh }) {
     doc.save(`${invoiceNumber || "facture"}.pdf`);
   };
 
-  // --- Sauvegarder dans Supabase ---
+  // --- Sauvegarder dans Supabase (summaryData et itemsData en JSONB) ---
   const handleSave = async () => {
     if (!clientId) {
       toast({ title: "Erreur", description: "Veuillez sélectionner un client", variant: "destructive" });
@@ -139,7 +164,10 @@ export default function InvoiceForm({ isOpen, onClose, refresh }) {
         due_date: periodeFin || null,
         status: "en_attente",
         periode_debut: periodeDebut || null,
-        periode_fin: periodeFin || null
+        periode_fin: periodeFin || null,
+        invoice_number: invoiceNumber || undefined,
+        summaryData,  // JSONB
+        itemsData     // JSONB
       }]);
       if (error) throw error;
       toast({ title: "Facture enregistrée", description: "La facture a été sauvegardée avec succès." });
@@ -175,13 +203,9 @@ export default function InvoiceForm({ isOpen, onClose, refresh }) {
           {/* Numéro de facture */}
           <div>
             <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">Numéro de facture</label>
-            <input
-              type="text"
-              className="w-full p-2 border rounded-md border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800"
-              value={invoiceNumber}
-              onChange={(e) => setInvoiceNumber(e.target.value)}
-              placeholder="Ex: N001-08/BAT/2025"
-            />
+            <div className="w-full p-2 border rounded-md border-gray-300 dark:border-gray-700 bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 select-none">
+              {invoiceNumber || "Généré automatiquement"}
+            </div>
           </div>
 
           {/* Sélect client */}
@@ -204,7 +228,7 @@ export default function InvoiceForm({ isOpen, onClose, refresh }) {
             </div>
           </div>
 
-          {/* Adresse */}
+          {/* Adresse / RCCM / IFU / Tel */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <input type="text" placeholder="Adresse" value={clientAddress} onChange={e => setClientAddress(e.target.value)} className="p-2 border rounded-md w-full border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800"/>
             <input type="text" placeholder="RCCM" value={clientRCCM} onChange={e => setClientRCCM(e.target.value)} className="p-2 border rounded-md w-full border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800"/>
