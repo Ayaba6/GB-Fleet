@@ -5,6 +5,7 @@ import { generateInvoicePDF } from "./InvoiceGenerator.jsx";
 import SummaryTableModal from "./SummaryTableModal.jsx";
 import ItemsTableModal from "./ItemsTableModal.jsx";
 import ClientFormModal from "./ClientFormModal.jsx";
+import InvoicePreviewModal from "./InvoicePreviewModal.jsx"; // ← nouveau import
 import { Button } from "../ui/button.jsx";
 import { supabase } from "../../config/supabaseClient.js";
 import { useToast } from "../ui/use-toast.jsx";
@@ -37,7 +38,9 @@ export default function InvoiceForm({ isOpen, onClose, refresh }) {
   const [isSummaryModalOpen, setIsSummaryModalOpen] = useState(false);
   const [isItemsModalOpen, setIsItemsModalOpen] = useState(false);
 
+  // --- Aperçu PDF ---
   const [pdfBlobUrl, setPdfBlobUrl] = useState(null);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false); // ← nouveau state
 
   // --- Charger clients ---
   const fetchClients = async () => {
@@ -68,53 +71,46 @@ export default function InvoiceForm({ isOpen, onClose, refresh }) {
   }, [clientId, clients]);
 
   // --- Générer numéro de facture automatique ---
-useEffect(() => {
-  if (!isOpen) return;
+  useEffect(() => {
+    if (!isOpen) return;
 
-  const generateNumber = async () => {
-    try {
-      const now = new Date();
-      const year = now.getFullYear();
-      const month = String(now.getMonth() + 1).padStart(2, "0");
+    const generateNumber = async () => {
+      try {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, "0");
 
-      // Exemple recherché : -02/BAT/2026
-      const monthlyPattern = `-${month}/BAT/${year}`;
+        const monthlyPattern = `-${month}/BAT/${year}`;
 
-      const { data, error } = await supabase
-        .from("invoices")
-        .select("invoice_number")
-        .like("invoice_number", `%${monthlyPattern}`)
-        .order("invoice_number", { ascending: false })
-        .limit(1);
+        const { data, error } = await supabase
+          .from("invoices")
+          .select("invoice_number")
+          .like("invoice_number", `%${monthlyPattern}`)
+          .order("invoice_number", { ascending: false })
+          .limit(1);
 
-      let nextNumber = 1;
+        let nextNumber = 1;
 
-      if (data && data.length > 0 && data[0].invoice_number) {
-        // Exemple : N012-02/BAT/2026
-        const match = data[0].invoice_number.match(/^N(\d+)-/);
-        if (match) {
-          nextNumber = parseInt(match[1], 10) + 1;
+        if (data && data.length > 0 && data[0].invoice_number) {
+          const match = data[0].invoice_number.match(/^N(\d+)-/);
+          if (match) nextNumber = parseInt(match[1], 10) + 1;
         }
+
+        const padded = String(nextNumber).padStart(3, "0");
+        const number = `N${padded}-${month}/BAT/${year}`;
+
+        setInvoiceNumber(number);
+      } catch (err) {
+        toast({
+          title: "Erreur",
+          description: "Impossible de générer le numéro de facture",
+          variant: "destructive",
+        });
       }
+    };
 
-      const padded = String(nextNumber).padStart(3, "0");
-      const number = `N${padded}-${month}/BAT/${year}`;
-
-      setInvoiceNumber(number);
-    } catch (err) {
-      toast({
-        title: "Erreur",
-        description: "Impossible de générer le numéro de facture",
-        variant: "destructive",
-      });
-    }
-  };
-
-  generateNumber();
-}, [isOpen]);
-
-
-
+    generateNumber();
+  }, [isOpen]);
 
   // --- Génération PDF automatique ---
   useEffect(() => {
@@ -190,8 +186,8 @@ useEffect(() => {
         periode_debut: periodeDebut || null,
         periode_fin: periodeFin || null,
         invoice_number: invoiceNumber || undefined,
-        summary_data: summaryData, // ← JSONB
-        items_data: itemsData      // ← JSONB
+        summary_data: summaryData,
+        items_data: itemsData
       }]);
       if (error) throw error;
       toast({ title: "Facture enregistrée", description: "La facture a été sauvegardée avec succès." });
@@ -286,9 +282,9 @@ useEffect(() => {
           <Button onClick={handleGeneratePDF} className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-md shadow transition">Générer le PDF</Button>
           <Button onClick={handleSave} className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-md shadow transition">Enregistrer</Button>
           {pdfBlobUrl && (
-            <a href={pdfBlobUrl} target="_blank" rel="noopener noreferrer" className="bg-gray-700 hover:bg-gray-800 text-white px-4 py-2 rounded-md shadow transition">
+            <Button onClick={() => setIsPreviewOpen(true)} className="bg-gray-700 hover:bg-gray-800 text-white px-4 py-2 rounded-md shadow transition">
               Aperçu PDF
-            </a>
+            </Button>
           )}
         </div>
 
@@ -296,6 +292,7 @@ useEffect(() => {
         <SummaryTableModal isOpen={isSummaryModalOpen} onClose={() => setIsSummaryModalOpen(false)} onUpdate={setSummaryData}/>
         <ItemsTableModal isOpen={isItemsModalOpen} onClose={() => setIsItemsModalOpen(false)} onUpdate={setItemsData}/>
         <ClientFormModal isOpen={isClientModalOpen} onClose={() => setIsClientModalOpen(false)} onClientAdded={handleClientAdded}/>
+        <InvoicePreviewModal isOpen={isPreviewOpen} onClose={() => setIsPreviewOpen(false)} pdfUrl={pdfBlobUrl}/>
       </div>
     </div>
   );

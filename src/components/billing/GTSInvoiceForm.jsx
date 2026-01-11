@@ -4,6 +4,7 @@ import { X, FileText } from "lucide-react";
 import { generateInvoicePDFGTS } from "./InvoiceGeneratorGTS.jsx";
 import SummaryTableModal from "./GTSSummaryTableModal.jsx";
 import ClientFormModal from "./GTSClientFormModal.jsx";
+import InvoicePreviewModal from "./InvoicePreviewModal.jsx"; // ← pour l'aperçu
 import { Button } from "../ui/button.jsx";
 import { supabase } from "../../config/supabaseClient.js";
 import { useToast } from "../ui/use-toast.jsx";
@@ -33,51 +34,46 @@ export default function GTSInvoiceForm({ isOpen, onClose, refresh }) {
   const [summaryData, setSummaryData] = useState([]);
   const [isSummaryModalOpen, setIsSummaryModalOpen] = useState(false);
 
+  // --- Aperçu PDF ---
   const [pdfBlobUrl, setPdfBlobUrl] = useState(null);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
   // --- Génération automatique du numéro de facture ---
   useEffect(() => {
-  if (!isOpen) return;
+    if (!isOpen) return;
 
-  const generateInvoiceNumber = async () => {
-    try {
-      const year = new Date().getFullYear();
+    const generateInvoiceNumber = async () => {
+      try {
+        const year = new Date().getFullYear();
 
-      const { data, error } = await supabase
-        .from("invoices_gts")
-        .select("invoice_number")
-        .like("invoice_number", `%/GTS/${year}`)
-        .order("invoice_number", { ascending: false })
-        .limit(1);
+        const { data, error } = await supabase
+          .from("invoices_gts")
+          .select("invoice_number")
+          .like("invoice_number", `%/GTS/${year}`)
+          .order("invoice_number", { ascending: false })
+          .limit(1);
 
-      if (error) throw error;
+        if (error) throw error;
 
-      let nextNumber = 1;
-
-      if (data && data.length > 0 && data[0].invoice_number) {
-        // Exemple : N°09/GTS/2026
-        const match = data[0].invoice_number.match(/^N°(\d+)/);
-        if (match) {
-          nextNumber = parseInt(match[1], 10) + 1;
+        let nextNumber = 1;
+        if (data && data.length > 0 && data[0].invoice_number) {
+          const match = data[0].invoice_number.match(/^N°(\d+)/);
+          if (match) nextNumber = parseInt(match[1], 10) + 1;
         }
+
+        const padded = String(nextNumber).padStart(2, "0");
+        setInvoiceNumber(`N°${padded}/GTS/${year}`);
+      } catch (err) {
+        toast({
+          title: "Erreur",
+          description: "Impossible de générer le numéro de facture GTS",
+          variant: "destructive",
+        });
       }
+    };
 
-      const padded = String(nextNumber).padStart(2, "0");
-      const invoiceNumber = `N°${padded}/GTS/${year}`;
-
-      setInvoiceNumber(invoiceNumber);
-    } catch (err) {
-      toast({
-        title: "Erreur",
-        description: "Impossible de générer le numéro de facture GTS",
-        variant: "destructive",
-      });
-    }
-  };
-
-  generateInvoiceNumber();
-}, [isOpen]);
-
+    generateInvoiceNumber();
+  }, [isOpen]);
 
   // --- Charger clients GTS ---
   useEffect(() => {
@@ -116,9 +112,46 @@ export default function GTSInvoiceForm({ isOpen, onClose, refresh }) {
     }
   }, [clientId, clients]);
 
+  // --- Génération automatique du PDF pour aperçu ---
+  useEffect(() => {
+    if (!isOpen) return;
+    if (!invoiceNumber || !clientName) return;
+
+    const invoiceData = {
+      invoiceNumber,
+      clientName,
+      clientAddress,
+      clientRCCM,
+      clientIFU,
+      clientTel,
+      clientRegimeFiscal,
+      clientDivisionFiscale,
+      clientZone,
+      description,
+      summaryData,
+    };
+
+    const doc = generateInvoicePDFGTS(invoiceData);
+    const pdfBlob = doc.output("blob");
+    setPdfBlobUrl(URL.createObjectURL(pdfBlob));
+  }, [
+    isOpen,
+    invoiceNumber,
+    clientName,
+    clientAddress,
+    clientRCCM,
+    clientIFU,
+    clientTel,
+    clientRegimeFiscal,
+    clientDivisionFiscale,
+    clientZone,
+    description,
+    summaryData
+  ]);
+
   if (!isOpen) return null;
 
-  // --- Génération PDF au clic seulement ---
+  // --- Générer PDF sur clic ---
   const handleGeneratePDF = () => {
     const invoiceData = {
       invoiceNumber,
@@ -135,14 +168,9 @@ export default function GTSInvoiceForm({ isOpen, onClose, refresh }) {
     };
     const doc = generateInvoicePDFGTS(invoiceData);
     doc.save(`${invoiceNumber || "facture-GTS"}.pdf`);
-
-    const pdfBlob = doc.output("blob");
-    setPdfBlobUrl(URL.createObjectURL(pdfBlob));
   };
 
-  // =========================
-  // ✅ CORRECTION ICI
-  // =========================
+  // --- Sauvegarde ---
   const handleSave = async () => {
     if (!clientId) {
       toast({ title: "Erreur", description: "Veuillez sélectionner un client", variant: "destructive" });
@@ -155,32 +183,21 @@ export default function GTSInvoiceForm({ isOpen, onClose, refresh }) {
           client_id: clientId,
           client_name: clientName,
           description,
-
-          amount: summaryData.reduce(
-            (acc, s) => acc + Number(s.amount || 0),
-            0
-          ),
-
+          amount: summaryData.reduce((acc, s) => acc + Number(s.amount || 0), 0),
           date_created: new Date().toISOString(),
           status: "en_attente",
           division_fiscale: clientDivisionFiscale,
           regime_fiscal: clientRegimeFiscal,
           zone: clientZone,
           invoice_number: invoiceNumber,
-
-          // ✅ AJOUT CRITIQUE
           summary_data: summaryData,
           items_data: summaryData,
-        }
+        },
       ]);
 
       if (error) throw error;
 
-      toast({
-        title: "Facture enregistrée",
-        description: "La facture GTS a été sauvegardée avec succès.",
-      });
-
+      toast({ title: "Facture enregistrée", description: "La facture GTS a été sauvegardée avec succès." });
       onClose();
       refresh();
     } catch (err) {
@@ -196,6 +213,7 @@ export default function GTSInvoiceForm({ isOpen, onClose, refresh }) {
   return (
     <div className="fixed inset-0 bg-black/60 flex justify-center items-center z-50 p-4">
       <div className="bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-2xl shadow-2xl w-full max-w-4xl p-6 overflow-y-auto max-h-[90vh] border border-gray-200 dark:border-gray-700">
+        
         {/* Header */}
         <div className="flex justify-between items-center border-b pb-3 mb-4 border-gray-200 dark:border-gray-700">
           <h2 className="text-xl font-semibold flex items-center gap-2">
@@ -256,21 +274,23 @@ export default function GTSInvoiceForm({ isOpen, onClose, refresh }) {
           <Button onClick={handleGeneratePDF} className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-md shadow transition">
             Générer le PDF
           </Button>
+
           <Button onClick={handleSave} className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-md shadow transition">
             Enregistrer
           </Button>
-          {pdfBlobUrl && (
-            <a
-              href={pdfBlobUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="bg-gray-700 hover:bg-gray-800 text-white px-4 py-2 rounded-md shadow transition"
-            >
-              Aperçu PDF
-            </a>
-          )}
+
+          <Button
+            onClick={() => setIsPreviewOpen(true)}
+            disabled={!pdfBlobUrl}
+            className={`px-6 py-2 rounded-md shadow transition ${
+              pdfBlobUrl ? "bg-gray-700 hover:bg-gray-800 text-white" : "bg-gray-300 text-gray-500 cursor-not-allowed"
+            }`}
+          >
+            Aperçu PDF
+          </Button>
         </div>
 
+        {/* Modals */}
         <SummaryTableModal
           isOpen={isSummaryModalOpen}
           onClose={() => setIsSummaryModalOpen(false)}
@@ -280,6 +300,11 @@ export default function GTSInvoiceForm({ isOpen, onClose, refresh }) {
           isOpen={isClientModalOpen}
           onClose={() => setIsClientModalOpen(false)}
           onClientAdded={handleClientAdded}
+        />
+        <InvoicePreviewModal
+          isOpen={isPreviewOpen}
+          onClose={() => setIsPreviewOpen(false)}
+          pdfUrl={pdfBlobUrl}
         />
       </div>
     </div>
