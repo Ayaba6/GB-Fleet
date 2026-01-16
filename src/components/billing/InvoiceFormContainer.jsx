@@ -1,11 +1,10 @@
-// src/components/billing/InvoiceForm.jsx
 import React, { useState, useEffect } from "react";
 import { X, FileText } from "lucide-react";
 import { generateInvoicePDF } from "./InvoiceGenerator.jsx";
 import SummaryTableModal from "./SummaryTableModal.jsx";
 import ItemsTableModal from "./ItemsTableModal.jsx";
 import ClientFormModal from "./ClientFormModal.jsx";
-import InvoicePreviewModal from "./InvoicePreviewModal.jsx"; // ← nouveau import
+import InvoicePreviewModal from "./InvoicePreviewModal.jsx";
 import { Button } from "../ui/button.jsx";
 import { supabase } from "../../config/supabaseClient.js";
 import { useToast } from "../ui/use-toast.jsx";
@@ -40,7 +39,7 @@ export default function InvoiceForm({ isOpen, onClose, refresh }) {
 
   // --- Aperçu PDF ---
   const [pdfBlobUrl, setPdfBlobUrl] = useState(null);
-  const [isPreviewOpen, setIsPreviewOpen] = useState(false); // ← nouveau state
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
   // --- Charger clients ---
   const fetchClients = async () => {
@@ -70,7 +69,7 @@ export default function InvoiceForm({ isOpen, onClose, refresh }) {
     }
   }, [clientId, clients]);
 
-  // --- Générer numéro de facture automatique ---
+  // --- Générer numéro de facture automatique (sans N) ---
   useEffect(() => {
     if (!isOpen) return;
 
@@ -80,26 +79,29 @@ export default function InvoiceForm({ isOpen, onClose, refresh }) {
         const year = now.getFullYear();
         const month = String(now.getMonth() + 1).padStart(2, "0");
 
-        const monthlyPattern = `-${month}/BAT/${year}`;
+        const suffix = `-${month}/BAT/${year}`;
 
         const { data, error } = await supabase
           .from("invoices")
           .select("invoice_number")
-          .like("invoice_number", `%${monthlyPattern}`)
-          .order("invoice_number", { ascending: false })
-          .limit(1);
+          .ilike("invoice_number", `%${suffix}`);
 
-        let nextNumber = 1;
+        if (error) throw error;
 
-        if (data && data.length > 0 && data[0].invoice_number) {
-          const match = data[0].invoice_number.match(/^N(\d+)-/);
-          if (match) nextNumber = parseInt(match[1], 10) + 1;
-        }
+        let maxNumber = 0;
 
-        const padded = String(nextNumber).padStart(3, "0");
-        const number = `N${padded}-${month}/BAT/${year}`;
+        data?.forEach(row => {
+          const match = row.invoice_number?.match(/^(\d{1,2})-/);
+          if (match) {
+            const num = parseInt(match[1], 10);
+            if (num > maxNumber) maxNumber = num;
+          }
+        });
 
-        setInvoiceNumber(number);
+        const nextNumber = maxNumber + 1;
+        const padded = String(nextNumber).padStart(2, "0");
+
+        setInvoiceNumber(`${padded}-${month}/BAT/${year}`);
       } catch (err) {
         toast({
           title: "Erreur",
@@ -130,8 +132,7 @@ export default function InvoiceForm({ isOpen, onClose, refresh }) {
       };
       const doc = generateInvoicePDF(invoiceData);
       const pdfBlob = doc.output("blob");
-      const url = URL.createObjectURL(pdfBlob);
-      setPdfBlobUrl(url);
+      setPdfBlobUrl(URL.createObjectURL(pdfBlob));
     }
   }, [
     isOpen,
@@ -206,7 +207,6 @@ export default function InvoiceForm({ isOpen, onClose, refresh }) {
   return (
     <div className="fixed inset-0 bg-black/60 flex justify-center items-center z-50 p-4 transition-all duration-300">
       <div className="bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-2xl shadow-2xl w-full max-w-4xl p-6 overflow-y-auto max-h-[90vh] border border-gray-200 dark:border-gray-700">
-
         {/* Header */}
         <div className="flex justify-between items-center border-b border-gray-200 dark:border-gray-700 pb-3 mb-4">
           <h2 className="text-xl font-semibold flex items-center gap-2">
@@ -219,7 +219,6 @@ export default function InvoiceForm({ isOpen, onClose, refresh }) {
 
         {/* Formulaire */}
         <div className="space-y-5 overflow-y-auto max-h-[60vh] pr-2">
-
           {/* Numéro de facture */}
           <div>
             <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">Numéro de facture</label>
@@ -246,7 +245,7 @@ export default function InvoiceForm({ isOpen, onClose, refresh }) {
             </div>
           </div>
 
-          {/* Adresse */}
+          {/* Adresse + RCCM + IFU + Tél */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <input type="text" placeholder="Adresse" value={clientAddress} onChange={e => setClientAddress(e.target.value)} className="p-2 border rounded-md w-full border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800"/>
             <input type="text" placeholder="RCCM" value={clientRCCM} onChange={e => setClientRCCM(e.target.value)} className="p-2 border rounded-md w-full border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800"/>
@@ -288,7 +287,7 @@ export default function InvoiceForm({ isOpen, onClose, refresh }) {
           )}
         </div>
 
-        {/* Modals enfants */}
+        {/* Modals */}
         <SummaryTableModal isOpen={isSummaryModalOpen} onClose={() => setIsSummaryModalOpen(false)} onUpdate={setSummaryData}/>
         <ItemsTableModal isOpen={isItemsModalOpen} onClose={() => setIsItemsModalOpen(false)} onUpdate={setItemsData}/>
         <ClientFormModal isOpen={isClientModalOpen} onClose={() => setIsClientModalOpen(false)} onClientAdded={handleClientAdded}/>

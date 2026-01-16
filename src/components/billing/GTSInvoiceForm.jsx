@@ -1,10 +1,9 @@
-// src/components/billing/GTSInvoiceForm.jsx
 import React, { useState, useEffect } from "react";
 import { X, FileText } from "lucide-react";
 import { generateInvoicePDFGTS } from "./InvoiceGeneratorGTS.jsx";
 import SummaryTableModal from "./GTSSummaryTableModal.jsx";
 import ClientFormModal from "./GTSClientFormModal.jsx";
-import InvoicePreviewModal from "./InvoicePreviewModal.jsx"; // ← pour l'aperçu
+import InvoicePreviewModal from "./InvoicePreviewModal.jsx";
 import { Button } from "../ui/button.jsx";
 import { supabase } from "../../config/supabaseClient.js";
 import { useToast } from "../ui/use-toast.jsx";
@@ -38,31 +37,36 @@ export default function GTSInvoiceForm({ isOpen, onClose, refresh }) {
   const [pdfBlobUrl, setPdfBlobUrl] = useState(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
-  // --- Génération automatique du numéro de facture ---
+  // --- Génération automatique du numéro de facture (sans N°) ---
   useEffect(() => {
     if (!isOpen) return;
 
     const generateInvoiceNumber = async () => {
       try {
         const year = new Date().getFullYear();
+        const month = String(new Date().getMonth() + 1).padStart(2, "0");
+        const suffix = `-${month}/GTS/${year}`;
 
         const { data, error } = await supabase
           .from("invoices_gts")
           .select("invoice_number")
-          .like("invoice_number", `%/GTS/${year}`)
-          .order("invoice_number", { ascending: false })
-          .limit(1);
+          .ilike("invoice_number", `%${suffix}`);
 
         if (error) throw error;
 
-        let nextNumber = 1;
-        if (data && data.length > 0 && data[0].invoice_number) {
-          const match = data[0].invoice_number.match(/^N°(\d+)/);
-          if (match) nextNumber = parseInt(match[1], 10) + 1;
-        }
+        let maxNumber = 0;
+        data?.forEach(row => {
+          const match = row.invoice_number?.match(/^(\d{1,2})-/);
+          if (match) {
+            const num = parseInt(match[1], 10);
+            if (num > maxNumber) maxNumber = num;
+          }
+        });
 
+        const nextNumber = maxNumber + 1;
         const padded = String(nextNumber).padStart(2, "0");
-        setInvoiceNumber(`N°${padded}/GTS/${year}`);
+
+        setInvoiceNumber(`${padded}-${month}/GTS/${year}`);
       } catch (err) {
         toast({
           title: "Erreur",
@@ -85,7 +89,6 @@ export default function GTSInvoiceForm({ isOpen, onClose, refresh }) {
           .from("clients_gts")
           .select("*")
           .order("name");
-
         if (error) throw error;
         setClients(data || []);
       } catch (err) {
@@ -231,7 +234,7 @@ export default function GTSInvoiceForm({ isOpen, onClose, refresh }) {
             placeholder="Numéro facture"
             value={invoiceNumber}
             onChange={(e) => setInvoiceNumber(e.target.value)}
-            className="w-full p-2 border rounded-md border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800"
+            className="w-full p-2 border rounded-md border-gray-300 dark:border-gray-700 bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 select-none"
           />
 
           {/* Sélect client */}
@@ -282,9 +285,7 @@ export default function GTSInvoiceForm({ isOpen, onClose, refresh }) {
           <Button
             onClick={() => setIsPreviewOpen(true)}
             disabled={!pdfBlobUrl}
-            className={`px-6 py-2 rounded-md shadow transition ${
-              pdfBlobUrl ? "bg-gray-700 hover:bg-gray-800 text-white" : "bg-gray-300 text-gray-500 cursor-not-allowed"
-            }`}
+            className={`px-6 py-2 rounded-md shadow transition ${pdfBlobUrl ? "bg-gray-700 hover:bg-gray-800 text-white" : "bg-gray-300 text-gray-500 cursor-not-allowed"}`}
           >
             Aperçu PDF
           </Button>
