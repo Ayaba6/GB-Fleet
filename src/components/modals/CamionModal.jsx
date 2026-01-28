@@ -15,7 +15,7 @@ const BASE_INPUT_STYLE = `
 `;
 
 /* =========================
-   FILE UPLOAD FIELD (STYLE FIX)
+   FILE UPLOAD FIELD
    ========================= */
 const FileUploadField = ({
   field,
@@ -119,19 +119,15 @@ export default function CamionModal({
     type: editingCamion?.type || "",
     statut: editingCamion?.statut || "Disponible",
     structure: editingCamion?.structure || "",
-
     photourl: editingCamion?.photourl || "",
-
     cartegriseurl: editingCamion?.cartegriseurl || "",
     cartegriseexpiry: editingCamion?.cartegriseexpiry || "",
     cartegriseurl2: editingCamion?.cartegriseurl2 || "",
     cartegriseexpiry2: editingCamion?.cartegriseexpiry2 || "",
-
     assuranceurl: editingCamion?.assuranceurl || "",
     assuranceexpiry: editingCamion?.assuranceexpiry || "",
     assuranceurl2: editingCamion?.assuranceurl2 || "",
     assuranceexpiry2: editingCamion?.assuranceexpiry2 || "",
-
     visitetechniqueurl: editingCamion?.visitetechniqueurl || "",
     visitetechniqueexpiry: editingCamion?.visitetechniqueexpiry || "",
     visitetechniqueurl2: editingCamion?.visitetechniqueurl2 || "",
@@ -143,44 +139,23 @@ export default function CamionModal({
     try {
       const ext = file.name.split(".").pop();
       const path = `${field}/${Date.now()}.${ext}`;
-
       await supabase.storage.from("uploads").upload(path, file, { upsert: true });
       const { data } = supabase.storage.from("uploads").getPublicUrl(path);
-
       setForm((f) => ({ ...f, [field]: data.publicUrl }));
     } catch (err) {
-      toast({
-        title: "Erreur upload",
-        description: err.message,
-        variant: "destructive",
-      });
+      toast({ title: "Erreur upload", description: err.message, variant: "destructive" });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleChange = async (e) => {
+  const handleChange = (e) => {
     const { name, value, files } = e.target;
-
     if (files?.length) {
-      await uploadFile(name, files[0]);
+      uploadFile(name, files[0]);
       return;
     }
-
-    if (name === "structure" && value !== "GTS") {
-      setForm((f) => ({
-        ...f,
-        structure: value,
-        cartegriseurl2: "",
-        cartegriseexpiry2: "",
-        assuranceurl2: "",
-        assuranceexpiry2: "",
-        visitetechniqueurl2: "",
-        visitetechniqueexpiry2: "",
-      }));
-    } else {
-      setForm((f) => ({ ...f, [name]: value }));
-    }
+    setForm((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleClearFile = (field, expField) => {
@@ -193,21 +168,38 @@ export default function CamionModal({
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (isSubmitting) return;
     setIsSubmitting(true);
 
     try {
-      if (editingCamion) {
-        await supabase.from("camions").update(form).eq("id", editingCamion.id);
+      // NETTOYAGE DES DONNÉES (Fix Error 400)
+      // Transforme les "" en null pour que Supabase accepte les dates vides
+      const cleanData = Object.keys(form).reduce((acc, key) => {
+        acc[key] = form[key] === "" ? null : form[key];
+        return acc;
+      }, {});
+
+      let response;
+      if (editingCamion?.id) {
+        response = await supabase
+          .from("camions")
+          .update(cleanData)
+          .eq("id", editingCamion.id);
       } else {
-        await supabase.from("camions").insert([form]);
+        response = await supabase
+          .from("camions")
+          .insert([cleanData]);
       }
 
-      toast({ title: "✅ Camion enregistré" });
+      if (response.error) throw response.error;
+
+      toast({ title: "✅ Camion enregistré avec succès" });
       fetchCamions?.();
       setShowModal(false);
     } catch (err) {
+      console.error("Erreur de soumission:", err);
       toast({
-        title: "Erreur Supabase",
+        title: "Erreur de sauvegarde",
         description: err.message,
         variant: "destructive",
       });
@@ -223,88 +215,61 @@ export default function CamionModal({
       </h2>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        <input
-          name="immatriculation"
-          placeholder="Immatriculation *"
-          value={form.immatriculation}
-          onChange={handleChange}
-          className={BASE_INPUT_STYLE}
-          required
-        />
-
-        <input
-          name="marquemodele"
-          placeholder="Marque / Modèle *"
-          value={form.marquemodele}
-          onChange={handleChange}
-          className={BASE_INPUT_STYLE}
-          required
-        />
-
-        <select
-          name="type"
-          value={form.type}
-          onChange={handleChange}
-          className={BASE_INPUT_STYLE}
-          required
-        >
-          <option value="" disabled>
-            -- Sélectionner le type --
-          </option>
-          <option value="Benne">Benne</option>
-          <option value="Tracteur">Tracteur</option>
-          <option value="Remorque">Remorque</option>
-        </select>
-
-        <select
-          name="structure"
-          value={form.structure}
-          onChange={handleChange}
-          className={BASE_INPUT_STYLE}
-          required
-        >
-          <option value="" disabled>
-            -- Affecter à --
-          </option>
-          <option value="GTS">GTS</option>
-          <option value="BATICOM">BATICOM</option>
-        </select>
-
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <FileUploadField field="photourl" label="Photo du Camion" icon={<Camera size={16} />} form={form} handleChange={handleChange} handleClearFile={handleClearFile} loading={loading} />
-
-          <FileUploadField field="cartegriseurl" label="Carte Grise" icon={<FileText size={16} />} expField="cartegriseexpiry" form={form} handleChange={handleChange} handleClearFile={handleClearFile} loading={loading} />
-
-          {form.structure === "GTS" && (
-            <FileUploadField field="cartegriseurl2" label="Carte Grise (2)" icon={<FileText size={16} />} expField="cartegriseexpiry2" form={form} handleChange={handleChange} handleClearFile={handleClearFile} loading={loading} />
-          )}
-
-          <FileUploadField field="assuranceurl" label="Assurance" icon={<FileText size={16} />} expField="assuranceexpiry" form={form} handleChange={handleChange} handleClearFile={handleClearFile} loading={loading} />
-
-          {form.structure === "GTS" && (
-            <FileUploadField field="assuranceurl2" label="Assurance (2)" icon={<FileText size={16} />} expField="assuranceexpiry2" form={form} handleChange={handleChange} handleClearFile={handleClearFile} loading={loading} />
-          )}
-
-          <FileUploadField field="visitetechniqueurl" label="Visite Technique" icon={<FileText size={16} />} expField="visitetechniqueexpiry" form={form} handleChange={handleChange} handleClearFile={handleClearFile} loading={loading} />
-
-          {form.structure === "GTS" && (
-            <FileUploadField field="visitetechniqueurl2" label="Visite Technique (2)" icon={<FileText size={16} />} expField="visitetechniqueexpiry2" form={form} handleChange={handleChange} handleClearFile={handleClearFile} loading={loading} />
-          )}
+          <div className="space-y-2">
+            <label className="text-sm font-semibold ml-1">Immatriculation *</label>
+            <input name="immatriculation" value={form.immatriculation} onChange={handleChange} className={BASE_INPUT_STYLE} required />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-semibold ml-1">Marque / Modèle *</label>
+            <input name="marquemodele" value={form.marquemodele} onChange={handleChange} className={BASE_INPUT_STYLE} required />
+          </div>
         </div>
 
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <label className="text-sm font-semibold ml-1">Type *</label>
+            <select name="type" value={form.type} onChange={handleChange} className={BASE_INPUT_STYLE} required>
+              <option value="" disabled>-- Type --</option>
+              <option value="Benne">Benne</option>
+              <option value="Tracteur">Tracteur</option>
+              <option value="Remorque">Remorque</option>
+              <option value="Semi-remorque">Semi-remorque</option>
+            </select>
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-semibold ml-1">Structure *</label>
+            <select name="structure" value={form.structure} onChange={handleChange} className={BASE_INPUT_STYLE} required>
+              <option value="" disabled>-- Affecter à --</option>
+              <option value="GTS">GTS</option>
+              <option value="BATICOM">BATICOM</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-100 dark:bg-gray-800/50 p-4 rounded-xl">
+          <FileUploadField field="photourl" label="Photo du Camion" icon={<Camera size={16} />} form={form} handleChange={handleChange} handleClearFile={handleClearFile} loading={loading} />
+          <FileUploadField field="cartegriseurl" label="Carte Grise" icon={<FileText size={16} />} expField="cartegriseexpiry" form={form} handleChange={handleChange} handleClearFile={handleClearFile} loading={loading} />
+          
+          <FileUploadField field="assuranceurl" label="Assurance" icon={<FileText size={16} />} expField="assuranceexpiry" form={form} handleChange={handleChange} handleClearFile={handleClearFile} loading={loading} />
+          <FileUploadField field="visitetechniqueurl" label="Visite Technique" icon={<FileText size={16} />} expField="visitetechniqueexpiry" form={form} handleChange={handleChange} handleClearFile={handleClearFile} loading={loading} />
+        </div>
+
+        {form.structure === "GTS" && (
+          <div className="space-y-4 bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl border border-blue-100 dark:border-blue-800">
+            <h3 className="text-sm font-bold text-blue-700 dark:text-blue-300">Documents Secondaires (GTS Uniquement)</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FileUploadField field="cartegriseurl2" label="Carte Grise (2)" icon={<FileText size={16} />} expField="cartegriseexpiry2" form={form} handleChange={handleChange} handleClearFile={handleClearFile} loading={loading} />
+              <FileUploadField field="assuranceurl2" label="Assurance (2)" icon={<FileText size={16} />} expField="assuranceexpiry2" form={form} handleChange={handleChange} handleClearFile={handleClearFile} loading={loading} />
+              <FileUploadField field="visitetechniqueurl2" label="Visite Tech (2)" icon={<FileText size={16} />} expField="visitetechniqueexpiry2" form={form} handleChange={handleChange} handleClearFile={handleClearFile} loading={loading} />
+            </div>
+          </div>
+        )}
+
         <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
-          <Button type="button" variant="outline" onClick={() => setShowModal(false)}>
-            Annuler
-          </Button>
-          <Button type="submit" disabled={loading || isSubmitting}>
-            {loading || isSubmitting ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Enregistrement...
-              </>
-            ) : (
-              "Enregistrer"
-            )}
+          <Button type="button" variant="outline" onClick={() => setShowModal(false)}>Annuler</Button>
+          <Button type="submit" disabled={loading || isSubmitting} className="bg-blue-600 hover:bg-blue-700 text-white min-w-[150px]">
+            {isSubmitting ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> ...</> : "Enregistrer"}
           </Button>
         </div>
       </form>
