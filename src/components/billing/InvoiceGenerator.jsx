@@ -1,19 +1,14 @@
-import jsPDF from "jspdf";
+import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import logo from "../../assets/logo_entete.png";
 
 // ===============================
-// Conversion nombre → lettres (FR)
+// Fonctions utilitaires
 // ===============================
 function convertNumberToWords(n) {
-  const units = [
-    "", "un", "deux", "trois", "quatre", "cinq", "six", "sept", "huit",
-    "neuf", "dix", "onze", "douze", "treize", "quatorze", "quinze", "seize"
-  ];
-  const tens = [
-    "", "dix", "vingt", "trente", "quarante",
-    "cinquante", "soixante", "soixante", "quatre-vingt", "quatre-vingt"
-  ];
+  if (n === 0) return "zéro";
+  const units = ["", "un", "deux", "trois", "quatre", "cinq", "six", "sept", "huit", "neuf", "dix", "onze", "douze", "treize", "quatorze", "quinze", "seize"];
+  const tens = ["", "dix", "vingt", "trente", "quarante", "cinquante", "soixante", "soixante", "quatre-vingt", "quatre-vingt"];
 
   function underHundred(num) {
     if (num < 17) return units[num];
@@ -21,13 +16,9 @@ function convertNumberToWords(n) {
     const ten = Math.floor(num / 10);
     const unit = num % 10;
     let word = tens[ten];
-    if (ten === 7 || ten === 9) {
-      word += "-" + units[10 + unit];
-    } else if (unit === 1 && ten !== 8) {
-      word += "-et-un";
-    } else if (unit > 0) {
-      word += "-" + units[unit];
-    }
+    if (ten === 7 || ten === 9) word += "-" + units[10 + unit];
+    else if (unit === 1 && ten !== 8) word += "-et-un";
+    else if (unit > 0) word += "-" + units[unit];
     if (ten === 8 && unit === 0) word += "s";
     return word;
   }
@@ -36,7 +27,6 @@ function convertNumberToWords(n) {
     let words = "";
     const hundreds = Math.floor(num / 100);
     const remainder = num % 100;
-
     if (hundreds > 0) {
       words += hundreds === 1 ? "cent" : units[hundreds] + " cent";
       if (remainder === 0 && hundreds > 1) words += "s";
@@ -46,167 +36,143 @@ function convertNumberToWords(n) {
     return words;
   }
 
-  if (n === 0) return "zéro";
-  if (n < 0) return "moins " + convertNumberToWords(-n);
-
   let words = "";
   const millions = Math.floor(n / 1_000_000);
   const thousands = Math.floor((n % 1_000_000) / 1_000);
   const remainder = n % 1_000;
-
-  if (millions > 0) {
-    words += convertNumberToWords(millions) + (millions > 1 ? " millions " : " million ");
-  }
-  if (thousands > 0) {
-    words += (thousands === 1 ? "mille " : convertNumberToWords(thousands) + " mille ");
-  }
+  if (millions > 0) words += convertNumberToWords(millions) + (millions > 1 ? " millions " : " million ");
+  if (thousands > 0) words += (thousands === 1 ? "mille " : convertNumberToWords(thousands) + " mille ");
   if (remainder > 0) words += underThousand(remainder);
-
-  return words.trim();
+  return words.trim() || "";
 }
 
-// ===============================
-// Format nombre avec espaces
-// ===============================
 function formatNumberWithSpace(n) {
-  if (typeof n !== "number") n = Number(n) || 0;
-  return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+  const val = typeof n === "number" ? n : Number(n) || 0;
+  return val.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
 }
 
 // ===============================
 // Générateur PDF Facture
 // ===============================
 export function generateInvoicePDF(invoiceData) {
+  if (!invoiceData) return;
   const doc = new jsPDF();
 
-  // --- Logo & entête ---
+  // --- Entête ---
   doc.addImage(logo, "PNG", 14, 10, 50, 20);
   doc.setFont("times", "normal");
   doc.setFontSize(10);
-  doc.text(
-    "BP 9342 OUAGA 06 | Tel: 25 50 81 89 / 70 00 80 24 | Mail: contact@baticom.bf",
-    105,
-    35,
-    { align: "center" }
-  );
-  doc.line(2, 38, 208, 38);
+  doc.text("BP 9342 OUAGA 06 | Tel: 25 50 81 89 / 70 00 80 24 | Mail: contact@baticom.bf", 105, 35, { align: "center" });
+  doc.line(10, 38, 200, 38);
 
-  // --- Date ---
   const today = new Date().toLocaleDateString("fr-FR");
   doc.setFontSize(11);
   doc.text(`Ouagadougou, le ${today}`, 196, 46, { align: "right" });
 
-  // --- Numéro de facture ---
-  let y = 68;
-
-  const rawInvoiceNumber = invoiceData.invoiceNumber || "";
-  const displayInvoiceNumber = rawInvoiceNumber
-    ? `N° ${rawInvoiceNumber}`
-    : "N° en cours de génération";
-
+  let currentY = 60;
   doc.setFont("times", "bold");
-  doc.setFontSize(12);
-  doc.text(displayInvoiceNumber, 14, y);
-  doc.line(
-    14,
-    y + 1,
-    14 + doc.getTextWidth(displayInvoiceNumber),
-    y + 1
-  );
+  const invoiceNo = `Facture N° ${invoiceData.invoiceNumber || ""}`;
+  doc.text(invoiceNo, 14, currentY);
+  doc.line(14, currentY + 1, 14 + doc.getTextWidth(invoiceNo), currentY + 1);
 
-  // --- Infos client ---
-  y += 8;
-
-  doc.setFontSize(11);
-  doc.text("Doit", 14, y);
-  doc.line(14, y + 1, 14 + doc.getTextWidth("Doit"), y + 1);
+  currentY += 10;
+  doc.text("Doit", 14, currentY);
+  doc.line(14, currentY + 1, 14 + doc.getTextWidth("Doit"), currentY + 1);
   doc.setFont("times", "normal");
-  doc.text(`: ${invoiceData.clientName || ""}`, 24, y);
+  doc.text(`: ${invoiceData.clientName || ""}`, 26, currentY);
 
-  let infoY = y + 8;
-
-  doc.setFont("times", "bold");
-  doc.text("Adresse", 14, infoY);
-  doc.line(14, infoY + 1, 14 + doc.getTextWidth("Adresse"), infoY + 1);
-  doc.setFont("times", "normal");
-  doc.text(`: ${invoiceData.clientAddress || ""}`, 32, infoY);
-
-  doc.setFont("times", "bold");
-  doc.text("RCCM", 100, infoY);
-  doc.line(100, infoY + 1, 100 + doc.getTextWidth("RCCM"), infoY + 1);
-  doc.setFont("times", "normal");
-  doc.text(`: ${invoiceData.clientRCCM || ""}`, 113, infoY);
-
-  infoY += 6;
-
-  doc.setFont("times", "bold");
-  doc.text("IFU", 14, infoY);
-  doc.line(14, infoY + 1, 14 + doc.getTextWidth("IFU"), infoY + 1);
-  doc.setFont("times", "normal");
-  doc.text(`: ${invoiceData.clientIFU || ""}`, 24, infoY);
-
-  doc.setFont("times", "bold");
-  doc.text("Tél", 50, infoY);
-  doc.line(50, infoY + 1, 50 + doc.getTextWidth("Tél"), infoY + 1);
-  doc.setFont("times", "normal");
-  doc.text(`: ${invoiceData.clientTel || ""}`, 58, infoY);
-
-  infoY += 8;
-
-  doc.setFont("times", "bold");
-  doc.text("Objet", 14, infoY);
-  doc.line(14, infoY + 1, 14 + doc.getTextWidth("Objet"), infoY + 1);
-  doc.setFont("times", "normal");
-  doc.text(`: ${invoiceData.description || "-"}`, 30, infoY);
-
-  infoY += 10;
-  doc.text(`Période : ${invoiceData.periode || ""}`, 14, infoY);
-  infoY += 12;
-
-  // --- Tableau résumé ---
-  let resumeTotal = 0;
-
-  if (invoiceData.summaryData?.length) {
-    autoTable(doc, {
-      startY: infoY,
-      head: [["Libellé", "Montant (FCFA)"]],
-      body: invoiceData.summaryData.map(r => [
-        r.label,
-        formatNumberWithSpace(Number(r.amount))
-      ]),
-      theme: "grid",
-      styles: { font: "times", fontSize: 10 },
-      headStyles: { fillColor: [60, 60, 60], textColor: 255 }
-    });
-
-    const totalRow = invoiceData.summaryData.find(r => r.label === "TOTAL HTVA");
-    if (totalRow) resumeTotal = Number(totalRow.amount) || 0;
-
-    infoY = doc.lastAutoTable.finalY + 10;
-  }
-
-  // --- Signature ---
-  if (resumeTotal > 0) {
-    const totalWords = convertNumberToWords(resumeTotal);
+  let infoY = currentY + 8;
+  const drawInfo = (label, value, x, y, valueOffset) => {
     doc.setFont("times", "bold");
-    doc.text("Arrêtée la présente facture à la somme HTVA de :", 14, infoY);
-    infoY += 6;
-
+    doc.text(label, x, y);
+    doc.line(x, y + 1, x + doc.getTextWidth(label), y + 1);
     doc.setFont("times", "normal");
-    doc.text(
-      `${totalWords.charAt(0).toUpperCase() + totalWords.slice(1)} (${formatNumberWithSpace(resumeTotal)}) francs CFA.`,
-      14,
-      infoY
-    );
+    doc.text(`: ${value || ""}`, x + valueOffset, y);
+  };
 
-    infoY += 18;
-    doc.setFont("times", "bold");
-    doc.text("Le Directeur", 160, infoY);
-    infoY += 20;
-    doc.text("KERE Leger", 160, infoY);
+  drawInfo("Adresse", invoiceData.clientAddress, 14, infoY, 18);
+  drawInfo("RCCM", invoiceData.clientRCCM, 100, infoY, 15);
+  infoY += 7;
+  drawInfo("IFU", invoiceData.clientIFU, 14, infoY, 10);
+  drawInfo("Tél", invoiceData.clientTel, 50, infoY, 8);
+  infoY += 8;
+  drawInfo("Objet", invoiceData.description, 14, infoY, 12);
+  infoY += 8;
+  doc.text(`Période : ${invoiceData.periode || ""}`, 14, infoY);
+
+  // --- I. TABLEAU RÉSUMÉ ---
+let nextTableY = infoY + 10;
+doc.setFont("times", "bold");
+doc.text("I.", 10, nextTableY);
+
+if (invoiceData.summaryData?.length > 0) {
+  autoTable(doc, {
+    startY: nextTableY - 4,
+    theme: "grid",
+    styles: { font: "times", fontSize: 10, cellPadding: 2, lineColor: [0, 0, 0], lineWidth: 0.2 },
+    columnStyles: { 1: { halign: "right", cellWidth: 40 } },
+    // textColor: [0, 0, 0] force le texte en noir
+    head: [[{ 
+      content: "Détails de Paiements", 
+      colSpan: 2, 
+      styles: { halign: 'center', fillColor: [240, 240, 240], textColor: [0, 0, 0], fontStyle: 'bold' } 
+    }]],
+    body: invoiceData.summaryData.map(r => [r.label, formatNumberWithSpace(r.amount)]),
+    didParseCell: (data) => {
+      if (data.cell.text[0] && data.cell.text[0].includes("TOTAL")) {
+        data.cell.fontStyle = 'bold';
+      }
+    }
+  });
+  nextTableY = doc.lastAutoTable.finalY + 12;
+}
+
+  // --- II. TABLEAU DÉTAILS ---
+  doc.setFont("times", "bold");
+  doc.text("II.", 10, nextTableY);
+
+  if (invoiceData.itemsData?.length > 0) {
+    autoTable(doc, {
+      startY: nextTableY - 4,
+      theme: "grid",
+      styles: { font: "times", fontSize: 9, cellPadding: 2, lineColor: [0, 0, 0], lineWidth: 0.2 },
+      headStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], fontStyle: "bold", halign: "center" },
+      columnStyles: { 3: { halign: "right", cellWidth: 35 } },
+      head: [
+        // Ligne d'intitulé au-dessus
+        [{ content: "Détails Contractuels", colSpan: 4, styles: { halign: 'center', fillColor: [240, 240, 240] } }],
+        ['Descriptions Travaux', 'Prix Unitaire (XOF)', 'Quantités', 'Total (XOF)']
+      ],
+      body: invoiceData.itemsData.map(item => [
+        item.description || item.label,
+        formatNumberWithSpace(item.unitPrice),
+        item.quantity,
+        formatNumberWithSpace(item.total)
+      ])
+    });
+    nextTableY = doc.lastAutoTable.finalY + 15;
   }
 
-  // --- Pied de page ---
+  // --- Signature et Arrêté ---
+  const totalRow = invoiceData.summaryData?.find(r => r.label && r.label.includes("TOTAL HTVA"));
+  const totalVal = totalRow ? Number(totalRow.amount) : 0;
+
+  if (totalVal > 0) {
+    doc.setFont("times", "normal");
+    doc.text("Arrêtée la présente facture à la somme HTVA de :", 14, nextTableY);
+    
+    doc.setFont("times", "bold");
+    const words = convertNumberToWords(totalVal);
+    const fullText = `${words.toUpperCase()} (${formatNumberWithSpace(totalVal)}) FRANCS CFA.`;
+    
+    const splitWords = doc.splitTextToSize(fullText, 180);
+    doc.text(splitWords, 14, nextTableY + 8);
+
+    doc.text("Le Directeur", 160, nextTableY + 25, { align: "center" });
+    doc.text("KERE Leger", 160, nextTableY + 45, { align: "center" });
+  }
+  
+// --- Pied de page ---
   const pageHeight = doc.internal.pageSize.getHeight();
   doc.line(2, pageHeight - 18, 208, pageHeight - 18);
   doc.setFontSize(9);
@@ -216,6 +182,6 @@ export function generateInvoicePDF(invoiceData) {
     pageHeight - 12,
     { align: "center" }
   );
-
+  
   return doc;
 }
