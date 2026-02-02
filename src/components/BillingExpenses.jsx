@@ -22,13 +22,18 @@ export default function BillingExpenses() {
   const [totals, setTotals] = useState({ invoices: 0, expenses: 0, balance: 0 });
   const [loading, setLoading] = useState(true);
 
+  // États des Modals
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
   const [isGTSInvoiceModalOpen, setIsGTSInvoiceModalOpen] = useState(false);
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
+
+  // États de modification (Data)
   const [editingInvoice, setEditingInvoice] = useState(null);
   const [editingGTSInvoice, setEditingGTSInvoice] = useState(null);
 
-  // --- Chargement des données ---
+  // ==========================================
+  // 1. CHARGEMENT DES DONNÉES
+  // ==========================================
   const fetchData = async () => {
     setLoading(true);
     try {
@@ -75,6 +80,22 @@ export default function BillingExpenses() {
     fetchData();
   }, []);
 
+  // ==========================================
+  // 2. GESTION DES OUVERTURES (ADD / EDIT)
+  // ==========================================
+  
+  // BATICOM
+  const handleOpenBaticom = (invoice = null) => {
+    setEditingInvoice(invoice);
+    setIsInvoiceModalOpen(true);
+  };
+
+  // GTS
+  const handleOpenGTS = (invoice = null) => {
+    setEditingGTSInvoice(invoice);
+    setIsGTSInvoiceModalOpen(true);
+  };
+
   const currencyFormatter = new Intl.NumberFormat("fr-FR", {
     style: "currency",
     currency: "XOF",
@@ -99,7 +120,7 @@ export default function BillingExpenses() {
   );
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 p-2 md:p-6">
       {/* Header & Actions */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between border-b pb-4 border-gray-200 dark:border-gray-700">
         <h1 className="text-3xl font-extrabold text-gray-800 dark:text-gray-100 flex items-center gap-3 mb-4 md:mb-0">
@@ -107,10 +128,10 @@ export default function BillingExpenses() {
           Gestion Financière
         </h1>
         <div className="flex gap-3 flex-wrap">
-          <Button onClick={() => setIsInvoiceModalOpen(true)} className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white">
+          <Button onClick={() => handleOpenBaticom()} className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white">
             <Plus size={18} /> Ajouter Facture BATICOM
           </Button>
-          <Button onClick={() => setIsGTSInvoiceModalOpen(true)} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white">
+          <Button onClick={() => handleOpenGTS()} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white">
             <Plus size={18} /> Ajouter Facture GTS
           </Button>
           <Button onClick={() => setIsExpenseModalOpen(true)} className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white">
@@ -142,7 +163,7 @@ export default function BillingExpenses() {
             content: <InvoicesList
               invoices={baticomInvoices}
               type="baticom"
-              onEdit={(inv) => { setEditingInvoice(inv); setIsInvoiceModalOpen(true); }}
+              onEdit={handleOpenBaticom}
               onDelete={async (id) => {
                 await supabase.from("invoices").delete().eq("id", id);
                 fetchData();
@@ -155,7 +176,7 @@ export default function BillingExpenses() {
             value: "gts",
             content: <GTSInvoicesList
               invoices={gtsInvoices}
-              onEdit={(inv) => { setEditingGTSInvoice(inv); setIsGTSInvoiceModalOpen(true); }}
+              onEdit={handleOpenGTS}
               refresh={fetchData}
             />,
           },
@@ -172,10 +193,39 @@ export default function BillingExpenses() {
         ]}
       />
 
-      {/* Modals */}
-      <InvoiceForm isOpen={isInvoiceModalOpen} onClose={() => setIsInvoiceModalOpen(false)} refresh={fetchData} initialData={editingInvoice} />
-      <GTSInvoiceForm isOpen={isGTSInvoiceModalOpen} onClose={() => setIsGTSInvoiceModalOpen(false)} refresh={fetchData} initialData={editingGTSInvoice} />
-      <ExpenseForm isOpen={isExpenseModalOpen} onClose={() => setIsExpenseModalOpen(false)} refresh={fetchData} camions={camions} />
+      {/* ==========================================
+          MODALS AVEC NETTOYAGE AU CLOSE
+      ========================================== */}
+      
+      {/* Modal BATICOM */}
+      <InvoiceForm 
+        isOpen={isInvoiceModalOpen} 
+        onClose={() => {
+          setIsInvoiceModalOpen(false);
+          setEditingInvoice(null);
+        }} 
+        refresh={fetchData} 
+        initialData={editingInvoice} 
+      />
+
+      {/* Modal GTS */}
+      <GTSInvoiceForm 
+        isOpen={isGTSInvoiceModalOpen} 
+        onClose={() => {
+          setIsGTSInvoiceModalOpen(false);
+          setEditingGTSInvoice(null);
+        }} 
+        refresh={fetchData} 
+        initialData={editingGTSInvoice} 
+      />
+
+      {/* Modal Dépense */}
+      <ExpenseForm 
+        isOpen={isExpenseModalOpen} 
+        onClose={() => setIsExpenseModalOpen(false)} 
+        refresh={fetchData} 
+        camions={camions} 
+      />
     </div>
   );
 }

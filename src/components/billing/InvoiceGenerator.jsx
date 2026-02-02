@@ -109,9 +109,18 @@ if (invoiceData.summaryData?.length > 0) {
   autoTable(doc, {
     startY: nextTableY - 4,
     theme: "grid",
-    styles: { font: "times", fontSize: 10, cellPadding: 2, lineColor: [0, 0, 0], lineWidth: 0.2 },
-    columnStyles: { 1: { halign: "right", cellWidth: 40 } },
-    // textColor: [0, 0, 0] force le texte en noir
+    styles: { 
+      font: "times", 
+      fontSize: 10, 
+      cellPadding: 2, 
+      lineColor: [0, 0, 0], 
+      lineWidth: 0.2,
+      textColor: [60, 60, 60] // Gris foncé pour les lignes normales
+    },
+    columnStyles: { 
+      0: { cellWidth: 'auto' }, 
+      1: { halign: "right", cellWidth: 35 } 
+    },
     head: [[{ 
       content: "Détails de Paiements", 
       colSpan: 2, 
@@ -119,8 +128,15 @@ if (invoiceData.summaryData?.length > 0) {
     }]],
     body: invoiceData.summaryData.map(r => [r.label, formatNumberWithSpace(r.amount)]),
     didParseCell: (data) => {
+      // Si la cellule contient "TOTAL"
       if (data.cell.text[0] && data.cell.text[0].includes("TOTAL")) {
         data.cell.fontStyle = 'bold';
+        data.cell.styles.textColor = [0, 0, 0]; // Noir pur (plus sombre)
+      }
+
+      // Si c'est spécifiquement la ligne HTVA, on peut aussi ajouter un léger fond
+      if (data.cell.text[0] && data.cell.text[0].includes("TOTAL HTVA")) {
+        data.cell.styles.fillColor = [245, 245, 245]; // Très léger gris pour l'accentuer
       }
     }
   });
@@ -128,30 +144,37 @@ if (invoiceData.summaryData?.length > 0) {
 }
 
   // --- II. TABLEAU DÉTAILS ---
-  doc.setFont("times", "bold");
-  doc.text("II.", 10, nextTableY);
+doc.setFont("times", "bold");
+doc.text("II.", 10, nextTableY);
 
-  if (invoiceData.itemsData?.length > 0) {
-    autoTable(doc, {
-      startY: nextTableY - 4,
-      theme: "grid",
-      styles: { font: "times", fontSize: 9, cellPadding: 2, lineColor: [0, 0, 0], lineWidth: 0.2 },
-      headStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], fontStyle: "bold", halign: "center" },
-      columnStyles: { 3: { halign: "right", cellWidth: 35 } },
-      head: [
-        // Ligne d'intitulé au-dessus
-        [{ content: "Détails Contractuels", colSpan: 4, styles: { halign: 'center', fillColor: [240, 240, 240] } }],
-        ['Descriptions Travaux', 'Prix Unitaire (XOF)', 'Quantités', 'Total (XOF)']
-      ],
-      body: invoiceData.itemsData.map(item => [
-        item.description || item.label,
-        formatNumberWithSpace(item.unitPrice),
-        item.quantity,
-        formatNumberWithSpace(item.total)
-      ])
-    });
-    nextTableY = doc.lastAutoTable.finalY + 15;
-  }
+if (invoiceData.itemsData?.length > 0) {
+  autoTable(doc, {
+    startY: nextTableY - 4,
+    theme: "grid",
+    styles: { font: "times", fontSize: 9, cellPadding: 2, lineColor: [0, 0, 0], lineWidth: 0.2 },
+    headStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], fontStyle: "bold", halign: "center" },
+    
+    // CONFIGURATION DES COLONNES
+    columnStyles: { 
+      0: { halign: "left" },           // Descriptions : à gauche
+      1: { halign: "center", cellWidth: 35 }, // Prix Unitaire : CENTRÉ
+      2: { halign: "center", cellWidth: 25 }, // Quantités : CENTRÉ
+      3: { halign: "right", cellWidth: 35 }   // Total : à droite
+    },
+
+    head: [
+      [{ content: "Détails Contractuels", colSpan: 4, styles: { halign: 'center', fillColor: [240, 240, 240] } }],
+      ['Descriptions Travaux', 'Prix Unitaire (XOF)', 'Quantités', 'Total (XOF)']
+    ],
+    body: invoiceData.itemsData.map(item => [
+      item.description || item.label,
+      formatNumberWithSpace(item.unitPrice),
+      item.quantity,
+      formatNumberWithSpace(item.total)
+    ])
+  });
+  nextTableY = doc.lastAutoTable.finalY + 6;
+}
 
   // --- Signature et Arrêté ---
   const totalRow = invoiceData.summaryData?.find(r => r.label && r.label.includes("TOTAL HTVA"));
@@ -166,7 +189,7 @@ if (invoiceData.summaryData?.length > 0) {
     const fullText = `${words.toUpperCase()} (${formatNumberWithSpace(totalVal)}) FRANCS CFA.`;
     
     const splitWords = doc.splitTextToSize(fullText, 180);
-    doc.text(splitWords, 14, nextTableY + 8);
+    doc.text(splitWords, 14, nextTableY + 6);
 
     doc.text("Le Directeur", 160, nextTableY + 25, { align: "center" });
     doc.text("KERE Leger", 160, nextTableY + 45, { align: "center" });

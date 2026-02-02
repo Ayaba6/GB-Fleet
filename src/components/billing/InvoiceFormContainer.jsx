@@ -9,14 +9,14 @@ import { Button } from "../ui/button.jsx";
 import { supabase } from "../../config/supabaseClient.js";
 import { useToast } from "../ui/use-toast.jsx";
 
-export default function InvoiceForm({ isOpen, onClose, refresh }) {
+export default function InvoiceForm({ isOpen, onClose, refresh, initialData }) {
   const { toast } = useToast();
 
-  // --- Facture ---
+  // --- États de la Facture ---
   const [invoiceNumber, setInvoiceNumber] = useState("");
   const [description, setDescription] = useState("");
 
-  // --- Client ---
+  // --- États Client ---
   const [clientId, setClientId] = useState(null);
   const [clientName, setClientName] = useState("");
   const [clientAddress, setClientAddress] = useState("");
@@ -27,21 +27,57 @@ export default function InvoiceForm({ isOpen, onClose, refresh }) {
   const [clients, setClients] = useState([]);
   const [isClientModalOpen, setIsClientModalOpen] = useState(false);
 
-  // --- Période ---
+  // --- États Période ---
   const [periodeDebut, setPeriodeDebut] = useState("");
   const [periodeFin, setPeriodeFin] = useState("");
 
-  // --- Tableaux ---
+  // --- États Tableaux ---
   const [summaryData, setSummaryData] = useState([]);
   const [itemsData, setItemsData] = useState([]);
   const [isSummaryModalOpen, setIsSummaryModalOpen] = useState(false);
   const [isItemsModalOpen, setIsItemsModalOpen] = useState(false);
 
-  // --- Aperçu PDF ---
+  // --- États Aperçu ---
   const [pdfBlobUrl, setPdfBlobUrl] = useState(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
-  // --- Charger clients ---
+  // Style commun pour la visibilité du texte
+  const inputStyle = "w-full p-2 border rounded-md border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-black dark:text-white";
+
+  // ==========================================
+  // 1. CHARGEMENT / RÉINITIALISATION
+  // ==========================================
+  useEffect(() => {
+    if (isOpen) {
+      if (initialData) {
+        setInvoiceNumber(initialData.invoice_number || "");
+        setDescription(initialData.description || "");
+        setClientId(initialData.client_id || null);
+        setClientName(initialData.client_name || "");
+        setPeriodeDebut(initialData.periode_debut || "");
+        setPeriodeFin(initialData.periode_fin || "");
+        setSummaryData(initialData.summary_data || []);
+        setItemsData(initialData.items_data || []);
+      } else {
+        setInvoiceNumber("");
+        setDescription("");
+        setClientId(null);
+        setClientName("");
+        setClientAddress("");
+        setClientRCCM("");
+        setClientIFU("");
+        setClientTel("");
+        setPeriodeDebut("");
+        setPeriodeFin("");
+        setSummaryData([]); 
+        setItemsData([]);
+      }
+    }
+  }, [isOpen, initialData]);
+
+  // ==========================================
+  // 2. LOGIQUE CLIENTS
+  // ==========================================
   const fetchClients = async () => {
     try {
       const { data, error } = await supabase.from("clients").select("*").order("name");
@@ -56,7 +92,6 @@ export default function InvoiceForm({ isOpen, onClose, refresh }) {
     if (isOpen) fetchClients();
   }, [isOpen]);
 
-  // --- Pré-remplir les champs client ---
   useEffect(() => {
     if (!clientId) return;
     const client = clients.find(c => c.id === clientId);
@@ -69,129 +104,63 @@ export default function InvoiceForm({ isOpen, onClose, refresh }) {
     }
   }, [clientId, clients]);
 
-  // --- Générer numéro de facture automatique (sans N) ---
+  // ==========================================
+  // 3. GÉNÉRATION NUMÉRO
+  // ==========================================
   useEffect(() => {
-    if (!isOpen) return;
-
+    if (!isOpen || initialData) return;
     const generateNumber = async () => {
       try {
         const now = new Date();
         const year = now.getFullYear();
         const month = String(now.getMonth() + 1).padStart(2, "0");
-
         const suffix = `-${month}/BAT/${year}`;
-
-        const { data, error } = await supabase
-          .from("invoices")
-          .select("invoice_number")
-          .ilike("invoice_number", `%${suffix}`);
-
-        if (error) throw error;
-
+        const { data } = await supabase.from("invoices").select("invoice_number").ilike("invoice_number", `%${suffix}`);
         let maxNumber = 0;
-
         data?.forEach(row => {
           const match = row.invoice_number?.match(/^(\d{1,2})-/);
-          if (match) {
-            const num = parseInt(match[1], 10);
-            if (num > maxNumber) maxNumber = num;
-          }
+          if (match) maxNumber = Math.max(maxNumber, parseInt(match[1], 10));
         });
-
-        const nextNumber = maxNumber + 1;
-        const padded = String(nextNumber).padStart(2, "0");
-
-        setInvoiceNumber(`${padded}-${month}/BAT/${year}`);
-      } catch (err) {
-        toast({
-          title: "Erreur",
-          description: "Impossible de générer le numéro de facture",
-          variant: "destructive",
-        });
-      }
+        setInvoiceNumber(`${String(maxNumber + 1).padStart(2, "0")}${suffix}`);
+      } catch (err) { console.error(err); }
     };
-
     generateNumber();
-  }, [isOpen]);
+  }, [isOpen, initialData]);
 
-  // --- Génération PDF automatique ---
-  useEffect(() => {
-    if (!isOpen) return;
-    if (invoiceNumber || clientName || summaryData.length || itemsData.length) {
-      const invoiceData = {
-        invoiceNumber,
-        clientName,
-        clientAddress,
-        clientRCCM,
-        clientIFU,
-        clientTel,
-        description,
-        periode: periodeDebut && periodeFin ? `${periodeDebut} au ${periodeFin}` : "",
-        summaryData,
-        itemsData,
-      };
-      const doc = generateInvoicePDF(invoiceData);
-      const pdfBlob = doc.output("blob");
-      setPdfBlobUrl(URL.createObjectURL(pdfBlob));
-    }
-  }, [
-    isOpen,
-    invoiceNumber,
-    clientName,
-    clientAddress,
-    clientRCCM,
-    clientIFU,
-    clientTel,
-    description,
-    periodeDebut,
-    periodeFin,
-    summaryData,
-    itemsData,
-  ]);
-
-  if (!isOpen) return null;
-
-  // --- Générer PDF ---
-  const handleGeneratePDF = () => {
-    const invoiceData = {
-      invoiceNumber,
-      clientName,
-      clientAddress,
-      clientRCCM,
-      clientIFU,
-      clientTel,
-      description,
-      periode: periodeDebut && periodeFin ? `${periodeDebut} au ${periodeFin}` : "",
-      summaryData,
-      itemsData,
-    };
-    const doc = generateInvoicePDF(invoiceData);
-    doc.save(`${invoiceNumber || "facture"}.pdf`);
-  };
-
-  // --- Sauvegarder dans Supabase ---
+  // ==========================================
+  // 4. SAUVEGARDE (AVEC RÉCUPÉRATION HTVA)
+  // ==========================================
   const handleSave = async () => {
     if (!clientId) {
       toast({ title: "Erreur", description: "Veuillez sélectionner un client", variant: "destructive" });
       return;
     }
+
+    // --- EXTRACTION DU MONTANT HTVA POUR LE DASHBOARD ---
+    const rowHTVA = summaryData.find(row => row.label === "TOTAL HTVA");
+    const amountToSave = rowHTVA ? Number(rowHTVA.amount) : 0;
+
+    const payload = {
+      client_id: clientId,
+      client_name: clientName,
+      description,
+      amount: amountToSave, // On enregistre le montant Net HTVA
+      due_date: periodeFin || null,
+      status: initialData ? initialData.status : "en_attente",
+      periode_debut: periodeDebut || null,
+      periode_fin: periodeFin || null,
+      invoice_number: invoiceNumber,
+      summary_data: summaryData,
+      items_data: itemsData,
+    };
+
     try {
-      const { error } = await supabase.from("invoices").insert([{
-        client_id: clientId,
-        client_name: clientName,
-        description,
-        amount: summaryData.reduce((acc, s) => acc + Number(s.amount || 0), 0),
-        date_created: new Date().toISOString(),
-        due_date: periodeFin || null,
-        status: "en_attente",
-        periode_debut: periodeDebut || null,
-        periode_fin: periodeFin || null,
-        invoice_number: invoiceNumber || undefined,
-        summary_data: summaryData,
-        items_data: itemsData
-      }]);
+      const { error } = initialData?.id 
+        ? await supabase.from("invoices").update(payload).eq("id", initialData.id)
+        : await supabase.from("invoices").insert([{ ...payload, date_created: new Date().toISOString() }]);
+
       if (error) throw error;
-      toast({ title: "Facture enregistrée", description: "La facture a été sauvegardée avec succès." });
+      toast({ title: "Succès", description: "Facture BATICOM enregistrée." });
       onClose();
       refresh();
     } catch (err) {
@@ -199,98 +168,101 @@ export default function InvoiceForm({ isOpen, onClose, refresh }) {
     }
   };
 
-  const handleClientAdded = (client) => {
-    setClients(prev => [...prev, client]);
-    setClientId(client.id);
-  };
+  // ==========================================
+  // 5. PDF AUTO-GENERATION
+  // ==========================================
+  useEffect(() => {
+    if (!isOpen || !clientName) return;
+    const invoiceData = {
+      invoiceNumber, clientName, clientAddress, clientRCCM, clientIFU, clientTel, description,
+      periode: periodeDebut && periodeFin ? `${periodeDebut} au ${periodeFin}` : "",
+      summaryData, itemsData,
+    };
+    const doc = generateInvoicePDF(invoiceData);
+    const url = URL.createObjectURL(doc.output("blob"));
+    setPdfBlobUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [isOpen, invoiceNumber, clientName, clientAddress, description, periodeDebut, periodeFin, summaryData, itemsData]);
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-black/60 flex justify-center items-center z-50 p-4 transition-all duration-300">
-      <div className="bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-2xl shadow-2xl w-full max-w-4xl p-6 overflow-y-auto max-h-[90vh] border border-gray-200 dark:border-gray-700">
+      <div className="bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-2xl shadow-2xl w-full max-w-4xl p-6 overflow-hidden flex flex-col max-h-[90vh] border border-gray-200 dark:border-gray-700">
+        
         {/* Header */}
         <div className="flex justify-between items-center border-b border-gray-200 dark:border-gray-700 pb-3 mb-4">
           <h2 className="text-xl font-semibold flex items-center gap-2">
-            <FileText className="text-blue-600" /> Nouvelle Facture
+            <FileText className="text-blue-600" /> 
+            {initialData ? `Modifier Facture ${invoiceNumber}` : "Nouvelle Facture BATICOM"}
           </h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-red-500 transition">
-            <X size={22} />
-          </button>
+          <button onClick={onClose} className="text-gray-400 hover:text-red-500 transition"><X size={22} /></button>
         </div>
 
         {/* Formulaire */}
-        <div className="space-y-5 overflow-y-auto max-h-[60vh] pr-2">
-          {/* Numéro de facture */}
+        <div className="space-y-5 overflow-y-auto pr-2 flex-1">
           <div>
-            <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">Numéro de facture</label>
-            <div className="w-full p-2 border rounded-md border-gray-300 dark:border-gray-700 bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 select-none">
-              {invoiceNumber || "Généré automatiquement"}
-            </div>
+            <label className="block text-sm font-medium text-gray-500 mb-1 uppercase tracking-tighter">Numéro de facture</label>
+            <div className={inputStyle + " font-mono bg-gray-50"}>{invoiceNumber || "En attente..."}</div>
           </div>
 
-          {/* Sélect client */}
-          <div>
-            <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">Client</label>
-            <div className="flex gap-2">
-              <select
-                className="flex-1 p-2 border rounded-md border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800"
-                value={clientId || ""}
-                onChange={(e) => setClientId(Number(e.target.value))}
-              >
+          <div className="flex gap-2 items-end">
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-gray-500 mb-1 uppercase tracking-tighter">Client</label>
+              <select className={inputStyle} value={clientId || ""} onChange={(e) => setClientId(Number(e.target.value))}>
                 <option value="">-- Sélectionner un client --</option>
-                {clients.map(c => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
+                {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
-              <Button onClick={() => setIsClientModalOpen(true)} className="px-3 py-2">+ Nouveau</Button>
             </div>
+            <Button onClick={() => setIsClientModalOpen(true)}>+ Nouveau</Button>
           </div>
 
-          {/* Adresse + RCCM + IFU + Tél */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <input type="text" placeholder="Adresse" value={clientAddress} onChange={e => setClientAddress(e.target.value)} className="p-2 border rounded-md w-full border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800"/>
-            <input type="text" placeholder="RCCM" value={clientRCCM} onChange={e => setClientRCCM(e.target.value)} className="p-2 border rounded-md w-full border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800"/>
-            <input type="text" placeholder="IFU" value={clientIFU} onChange={e => setClientIFU(e.target.value)} className="p-2 border rounded-md w-full border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800"/>
-            <input type="text" placeholder="Téléphone" value={clientTel} onChange={e => setClientTel(e.target.value)} className="p-2 border rounded-md w-full border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800"/>
+            <input type="text" placeholder="Adresse" value={clientAddress} readOnly className={inputStyle + " bg-gray-50 text-gray-500"}/>
+            <input type="text" placeholder="RCCM" value={clientRCCM} readOnly className={inputStyle + " bg-gray-50 text-gray-500"}/>
+            <input type="text" placeholder="IFU" value={clientIFU} readOnly className={inputStyle + " bg-gray-50 text-gray-500"}/>
+            <input type="text" placeholder="Téléphone" value={clientTel} readOnly className={inputStyle + " bg-gray-50 text-gray-500"}/>
           </div>
 
-          {/* Description */}
-          <div>
-            <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">Description</label>
-            <input type="text" value={description} onChange={e => setDescription(e.target.value)} placeholder="Ex: Transport de Minerai Ore" className="w-full p-2 border rounded-md border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800"/>
-          </div>
+          <input type="text" placeholder="Description (ex: Transport minerai)" value={description} onChange={e => setDescription(e.target.value)} className={inputStyle}/>
 
-          {/* Période */}
-          <div>
-            <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">Période</label>
-            <div className="flex gap-2 items-center mt-1">
-              <input type="date" className="p-2 border rounded-md border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800" value={periodeDebut} onChange={e => setPeriodeDebut(e.target.value)} required/>
-              <span className="text-gray-600 dark:text-gray-400">au</span>
-              <input type="date" className="p-2 border rounded-md border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800" value={periodeFin} onChange={e => setPeriodeFin(e.target.value)} required/>
+          <div className="flex gap-4 items-center bg-blue-50/50 p-3 rounded-lg border border-blue-100">
+            <div className="flex-1">
+               <label className="block text-[10px] font-bold text-blue-600 uppercase">Période du</label>
+               <input type="date" className={inputStyle} value={periodeDebut} onChange={e => setPeriodeDebut(e.target.value)}/>
+            </div>
+            <span className="mt-4 font-bold text-blue-300">au</span>
+            <div className="flex-1">
+               <label className="block text-[10px] font-bold text-blue-600 uppercase">Période au</label>
+               <input type="date" className={inputStyle} value={periodeFin} onChange={e => setPeriodeFin(e.target.value)}/>
             </div>
           </div>
 
-          {/* Boutons modaux */}
           <div className="flex flex-wrap gap-3 pt-3">
-            <Button onClick={() => setIsSummaryModalOpen(true)} className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md transition">Remplir Tableau Résumé</Button>
-            <Button onClick={() => setIsItemsModalOpen(true)} className="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-md transition">Remplir Tableau Détails</Button>
+            <Button onClick={() => setIsSummaryModalOpen(true)} className="bg-green-600 hover:bg-green-700 text-white flex-1 py-6">
+              {summaryData.length > 0 ? "✅ Résumé d'Exploitation (Éditer)" : "📊 Remplir Résumé d'Exploitation"}
+            </Button>
+            <Button onClick={() => setIsItemsModalOpen(true)} className="bg-amber-600 hover:bg-amber-700 text-white flex-1 py-6">
+              {itemsData.length > 0 ? "✅ Détails Prestation (Éditer)" : "📝 Remplir Détails Prestation"}
+            </Button>
           </div>
         </div>
 
-        {/* Actions */}
-        <div className="mt-6 flex justify-end gap-3 border-t border-gray-200 dark:border-gray-700 pt-4">
-          <Button onClick={handleGeneratePDF} className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-md shadow transition">Générer le PDF</Button>
-          <Button onClick={handleSave} className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-md shadow transition">Enregistrer</Button>
-          {pdfBlobUrl && (
-            <Button onClick={() => setIsPreviewOpen(true)} className="bg-gray-700 hover:bg-gray-800 text-white px-4 py-2 rounded-md shadow transition">
-              Aperçu PDF
+        {/* Actions Finales */}
+        <div className="mt-6 flex justify-between items-center border-t border-gray-200 dark:border-gray-700 pt-4">
+          <Button onClick={() => setIsPreviewOpen(true)} disabled={!pdfBlobUrl} variant="outline">Aperçu PDF</Button>
+          
+          <div className="flex gap-3">
+            <Button onClick={handleSave} className="bg-green-600 hover:bg-green-700 text-white px-10 py-5 text-lg font-bold">
+              {initialData ? "Mettre à jour" : "Enregistrer la Facture"}
             </Button>
-          )}
+          </div>
         </div>
 
-        {/* Modals */}
-        <SummaryTableModal isOpen={isSummaryModalOpen} onClose={() => setIsSummaryModalOpen(false)} onUpdate={setSummaryData}/>
-        <ItemsTableModal isOpen={isItemsModalOpen} onClose={() => setIsItemsModalOpen(false)} onUpdate={setItemsData}/>
-        <ClientFormModal isOpen={isClientModalOpen} onClose={() => setIsClientModalOpen(false)} onClientAdded={handleClientAdded}/>
+        {/* Modals Internes */}
+        <SummaryTableModal isOpen={isSummaryModalOpen} onClose={() => setIsSummaryModalOpen(false)} onUpdate={setSummaryData} initialData={summaryData} />
+        <ItemsTableModal isOpen={isItemsModalOpen} onClose={() => setIsItemsModalOpen(false)} onUpdate={setItemsData} initialData={itemsData} />
+        <ClientFormModal isOpen={isClientModalOpen} onClose={() => setIsClientModalOpen(false)} onClientAdded={fetchClients}/>
         <InvoicePreviewModal isOpen={isPreviewOpen} onClose={() => setIsPreviewOpen(false)} pdfUrl={pdfBlobUrl}/>
       </div>
     </div>
