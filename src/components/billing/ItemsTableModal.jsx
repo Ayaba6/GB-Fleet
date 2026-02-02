@@ -1,173 +1,127 @@
 import React, { useState, useEffect } from "react";
-import { Plus, Trash2, Save } from "lucide-react"; 
+import { Plus, Trash2, Save, X } from "lucide-react"; 
 import { Button } from "../ui/button.jsx";
 
-const DESIGNATION_OPTIONS = [
-  "Nombre de voyages (U)",
-  "Tonnages (T)",
-  "Consommation Fuel (L)",
-  "Back charge (U)",
+// Configuration stricte selon items.PNG et vos instructions
+const DEFAULT_VALUES = [
+  { description: "Transport minerais-NIOU- Bissa ROM-Pad(km)", unitPrice: "1", quantity: "70" }, // Quantité préréglée selon l'image
+  { description: "Nombres de voyages(U)", unitPrice: "1", quantity: "135" }, // Quantité préréglée selon l'image
+  { description: "Tonnages(T)", unitPrice: "55", quantity: "5752" }, // Valeurs issues de l'image
+  { description: "Consommation Fuel(L)", unitPrice: "1150", quantity: "10380" }, // Valeurs issues de l'image
+  { description: "Back charge Dec 25 - Jan 26 (U)", unitPrice: "11", quantity: "170000" }, // Prêt pour saisie ou modification
 ];
 
 export default function ItemsTableModal({ isOpen, onClose, onUpdate, initialData = [] }) {
-  // --- ÉTAT LOCAL ---
-  const [rows, setRows] = useState([{ description: "", unitPrice: "", quantity: "" }]);
+  const [rows, setRows] = useState([]);
 
-  // ==========================================
-  // 1. SYNCHRONISATION (Crucial pour la modification)
-  // ==========================================
- useEffect(() => {
-  if (isOpen) {
-    // Si initialData est vide (nouvelle facture), on repart sur une ligne propre
-    if (!initialData || initialData.length === 0) {
-      setRows([{ description: "", unitPrice: "", quantity: "" }]);
-    } else {
-      // Sinon on charge les données de la facture à modifier
-      setRows(initialData);
+  useEffect(() => {
+    if (isOpen) {
+      if (!initialData || initialData.length === 0) {
+        // Mode création : chargement automatique du modèle complet
+        setRows(DEFAULT_VALUES.map(item => ({ ...item })));
+      } else {
+        // Mode édition : chargement des données sauvegardées
+        setRows(initialData.map(r => ({
+          ...r,
+          unitPrice: r.unitPrice.toString(),
+          quantity: r.quantity.toString()
+        })));
+      }
     }
-  }
-}, [isOpen, initialData]);
+  }, [isOpen, initialData]);
 
   if (!isOpen) return null;
-
-  // --- ACTIONS ---
-  const handleAddRow = () => setRows([...rows, { description: "", unitPrice: "", quantity: "" }]);
-
-  const handleRemoveRow = (idx) => {
-    if (rows.length === 1) {
-      setRows([{ description: "", unitPrice: "", quantity: "" }]);
-      return;
-    }
-    setRows(rows.filter((_, i) => i !== idx));
-  };
 
   const handleChange = (idx, field, value) => {
     const newRows = [...rows];
     if (field === "unitPrice" || field === "quantity") {
-      value = value.replace(/[^0-9.]/g, ""); // Autorise les chiffres et le point décimal
+      value = value.replace(/[^0-9]/g, ""); // Sécurité : chiffres uniquement
     }
     newRows[idx][field] = value;
     setRows(newRows);
   };
 
+  const calculateRowTotal = (row) => {
+    const price = Number(row.unitPrice) || 0;
+    const qty = Number(row.quantity) || 0;
+    // Logique BATICOM : Le tonnage multiplie par 70
+    return row.description.includes("Tonnages") ? price * qty * 70 : price * qty;
+  };
+
   const handleSave = () => {
-    // Filtrer les lignes vides avant de sauvegarder
-    const validRows = rows.filter(r => r.description !== "" || r.unitPrice !== "");
-    
     onUpdate(
-      validRows.map((r) => {
-        const price = Number(r.unitPrice) || 0;
-        const qty = Number(r.quantity) || 0;
-        // Logique spécifique : Tonnages multiplie par 70
-        const total = r.description === "Tonnages (T)" ? price * qty * 70 : price * qty;
-        return { 
-          description: r.description, 
-          unitPrice: price, 
-          quantity: qty, 
-          total 
-        };
-      })
+      rows.filter(r => r.description !== "").map((r) => ({
+        ...r,
+        unitPrice: Number(r.unitPrice) || 0,
+        quantity: Number(r.quantity) || 0,
+        total: calculateRowTotal(r)
+      }))
     );
     onClose();
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[110] p-4">
-      <div className="bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-xl shadow-2xl w-full max-w-4xl p-6 max-h-[85vh] flex flex-col border border-gray-200 dark:border-gray-700">
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[110] p-4 font-sans">
+      <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full max-w-6xl p-6 max-h-[90vh] flex flex-col border border-gray-200">
         
-        {/* Header */}
-        <div className="flex justify-between items-center border-b border-gray-200 dark:border-gray-700 pb-3 mb-4">
-          <h2 className="text-xl font-semibold flex items-center gap-2">
-            <Plus className="text-blue-600" /> 
-            {initialData.length > 0 ? "Modifier les Détails" : "Remplir Tableau Détails"}
-          </h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-red-500 transition">
-            <Trash2 size={22} />
-          </button>
+        <div className="flex justify-between items-center border-b pb-4 mb-4">
+          <h2 className="text-xl font-bold text-gray-800 dark:text-white">Détails des Travaux (Modèle BATICOM)</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-red-500 transition"><X size={24} /></button>
         </div>
 
-        {/* Corps du Tableau */}
-        <div className="flex-1 overflow-y-auto space-y-3 pr-2">
-          {rows.map((row, idx) => {
-            const price = Number(row.unitPrice) || 0;
-            const qty = Number(row.quantity) || 0;
-            const total = row.description === "Tonnages (T)" ? price * qty * 70 : price * qty;
+        <div className="flex-1 overflow-y-auto space-y-2 pr-2">
+          {/* En-tête du tableau pour plus de clarté */}
+          <div className="grid grid-cols-12 gap-2 px-2 mb-2 text-[11px] font-black text-gray-400 uppercase tracking-wider">
+            <div className="col-span-5">Désignation Travaux</div>
+            <div className="col-span-2 text-center">P.U (XOF)</div>
+            <div className="col-span-2 text-center">Quantités</div>
+            <div className="col-span-2 text-right">Total (XOF)</div>
+            <div className="col-span-1"></div>
+          </div>
 
-            return (
-              <div key={idx} className="grid grid-cols-1 md:grid-cols-6 gap-3 items-center p-3 border rounded-lg dark:border-gray-800 relative group">
-                {/* Désignation */}
-                <div className="md:col-span-2">
-                  {idx === 0 && !initialData.length ? (
-                    <input
-                      type="text"
-                      className="w-full p-2 border rounded-md dark:bg-gray-800"
-                      placeholder="Description libre (ex: Transport...)"
-                      value={row.description}
-                      onChange={(e) => handleChange(idx, "description", e.target.value)}
-                    />
-                  ) : (
-                    <select
-                      className="w-full p-2 border rounded-md dark:bg-gray-800"
-                      value={row.description}
-                      onChange={(e) => handleChange(idx, "description", e.target.value)}
-                    >
-                      <option value="">-- Sélectionner --</option>
-                      {DESIGNATION_OPTIONS.map((opt) => (
-                        <option key={opt} value={opt}>{opt}</option>
-                      ))}
-                    </select>
-                  )}
-                </div>
-
-                {/* PU */}
+          {rows.map((row, idx) => (
+            <div key={idx} className="grid grid-cols-12 gap-2 items-center p-2 border rounded-md bg-white hover:bg-blue-50/30 transition">
+              <div className="col-span-5">
+                <input
+                  className="w-full p-2 border-none focus:ring-0 bg-transparent text-black font-medium"
+                  value={row.description}
+                  onChange={(e) => handleChange(idx, "description", e.target.value)}
+                />
+              </div>
+              <div className="col-span-2">
                 <input
                   type="text"
-                  className="p-2 border rounded-md text-right dark:bg-gray-800"
-                  placeholder="Prix Unit."
-                  value={row.unitPrice}
+                  className="w-full p-2 border rounded text-center text-black bg-gray-50 focus:bg-white"
+                  value={row.unitPrice.replace(/\B(?=(\d{3})+(?!\d))/g, " ")}
                   onChange={(e) => handleChange(idx, "unitPrice", e.target.value)}
                 />
-
-                {/* Quantité */}
+              </div>
+              <div className="col-span-2">
                 <input
                   type="text"
-                  className="p-2 border rounded-md text-right dark:bg-gray-800"
-                  placeholder="Qté"
-                  value={row.quantity}
+                  className="w-full p-2 border rounded text-center text-black font-bold bg-gray-50 focus:bg-white"
+                  value={row.quantity.replace(/\B(?=(\d{3})+(?!\d))/g, " ")}
                   onChange={(e) => handleChange(idx, "quantity", e.target.value)}
                 />
-
-                {/* Montant Total Ligne */}
-                <div className="p-2 border rounded-md bg-gray-50 dark:bg-gray-800/50 text-right font-bold text-blue-600 dark:text-blue-400">
-                  {total.toLocaleString("fr-FR")}
-                </div>
-
-                {/* Bouton Supprimer */}
-                <button
-                  onClick={() => handleRemoveRow(idx)}
-                  className="absolute -right-2 -top-2 md:static text-gray-400 hover:text-red-600 bg-white dark:bg-gray-900 rounded-full p-1 shadow-sm md:shadow-none"
-                >
+              </div>
+              <div className="col-span-2 text-right font-black text-blue-600">
+                {calculateRowTotal(row).toLocaleString("fr-FR")}
+              </div>
+              <div className="col-span-1 flex justify-end px-2">
+                <button onClick={() => setRows(rows.filter((_, i) => i !== idx))} className="text-gray-300 hover:text-red-500">
                   <Trash2 size={18} />
                 </button>
               </div>
-            );
-          })}
+            </div>
+          ))}
         </div>
 
-        {/* Footer Actions */}
-        <div className="flex justify-between items-center mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
-          <Button 
-            onClick={handleAddRow} 
-            className="bg-green-600 hover:bg-green-700 text-white flex gap-2"
-          >
-            <Plus size={18} /> Ajouter une ligne
+        <div className="mt-6 flex justify-between items-center border-t pt-4">
+          <Button onClick={() => setRows([...rows, { description: "", unitPrice: "", quantity: "" }])} variant="outline" className="text-green-600 border-green-600">
+            + Ajouter ligne libre
           </Button>
-          
-          <Button 
-            onClick={handleSave} 
-            className="bg-blue-600 hover:bg-blue-700 text-white flex gap-2 px-8"
-          >
-            <Save size={18} /> Enregistrer les détails
+          <Button onClick={handleSave} className="bg-blue-700 hover:bg-blue-800 text-white px-12 py-5 font-bold">
+            Valider la saisie
           </Button>
         </div>
       </div>
