@@ -8,6 +8,12 @@ import { Button } from "../ui/button.jsx";
 import { supabase } from "../../config/supabaseClient.js";
 import { useToast } from "../ui/use-toast.jsx";
 
+// Constantes pour les descriptions de transport
+const PRESTATIONS_GTS = [
+  "Transport de clinker (Lome-Ouagadougou)",
+  "Transport de gypse (Lome-Ouagadougou)",
+];
+
 export default function GTSInvoiceForm({ isOpen, onClose, refresh, initialData = null }) {
   const { toast } = useToast();
 
@@ -241,7 +247,18 @@ export default function GTSInvoiceForm({ isOpen, onClose, refresh, initialData =
 
           <div>
             <label className="text-xs font-bold text-gray-500 uppercase">Description de la prestation</label>
-            <input type="text" value={description} onChange={e => setDescription(e.target.value)} className={textInputStyle} placeholder="Détails..." />
+            <select 
+              value={description} 
+              onChange={e => setDescription(e.target.value)} 
+              className={textInputStyle}
+            >
+              <option value="">-- Sélectionner une prestation --</option>
+              {PRESTATIONS_GTS.map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div className="bg-gray-50 dark:bg-gray-800/50 p-4 rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-700">
