@@ -87,30 +87,29 @@ export default function UsersSection() {
   }, [fetchUsers]);
 
   const confirmDelete = async () => {
-    try {
-      const { error } = await supabase
-        .from("profiles")
-        .delete()
-        .eq("id", userToDelete.id);
+  try {
+    // On appelle la fonction RPC qui supprime l'utilisateur dans AUTH et dans PROFILES
+    const { error } = await supabase.rpc('delete_user_completely', {
+      target_user_id: userToDelete.id
+    });
 
-      if (error) throw error;
+    if (error) throw error;
 
-      toast({
-        title: "Utilisateur supprimé",
-        description: `L'utilisateur "${userToDelete.name}" a été supprimé.`
-      });
+    toast({
+      title: "Utilisateur supprimé",
+      description: `Le compte de "${userToDelete.name}" a été définitivement supprimé.`
+    });
 
-      fetchUsers();
-      setUserToDelete(null);
-      setConfirmOpen(false);
-    } catch (err) {
-      toast({
-        title: "Erreur",
-        description: err.message,
-        variant: "destructive"
-      });
-    }
-  };
+    fetchUsers(); // Rafraîchir la liste
+    setConfirmOpen(false);
+  } catch (err) {
+    toast({
+      title: "Erreur de suppression",
+      description: err.message,
+      variant: "destructive"
+    });
+  }
+};
 
   const handleEdit = (u) => {
     setEditingUser(u);
