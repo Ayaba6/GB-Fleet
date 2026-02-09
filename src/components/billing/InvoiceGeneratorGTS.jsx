@@ -139,7 +139,8 @@ export const generateInvoicePDFGTS = (invoiceData) => {
 
   /* ===== TABLEAU ===== */
   if(invoiceData.summaryData?.length){
-    const tableHead = ["N°","Immatriculation","Bon","Date","Quantité (T)","Tarif","Retenue 5%","Montant net"];
+    // Modification de l'en-tête ici
+    const tableHead = ["N°","Immatriculation","Bon","Date","Quantité (T)","Tarif (33000)","Retenue 5%","Montant net"];
     
     // Totaux
     const totQ = invoiceData.summaryData.reduce((acc, r) => acc + parseDecimal(r.quantite), 0);
@@ -148,9 +149,14 @@ export const generateInvoicePDFGTS = (invoiceData) => {
     const totN = invoiceData.summaryData.reduce((acc, r) => acc + (Number(r.montantNet) || 0), 0);
 
     const tableBody = invoiceData.summaryData.map((r,i)=>[
-      i+1, r.immatriculation||"-", r.bonLivraison||"-", r.dateDechargement||"-",
-      r.quantite || "0,00", formatNumberWithSpace(Number(r.tarif)||0),
-      formatNumberWithSpace(Number(r.retenue)||0), formatNumberWithSpace(Number(r.montantNet)||0)
+      i+1, 
+      r.immatriculation||"-", 
+      r.bonLivraison||"-", 
+      r.dateDechargement||"-",
+      r.quantite || "0,00", 
+      formatNumberWithSpace(Number(r.tarif || 0)), // Correction de la parenthèse ici
+      formatNumberWithSpace(Number(r.retenue)||0), 
+      formatNumberWithSpace(Number(r.montantNet)||0)
     ]);
 
     tableBody.push([
