@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import Tabs from "../components/ui/tabs.jsx";
 import { supabase } from "../config/supabaseClient.js";
 import InvoicesList from "../components/billing/InvoicesList.jsx";
@@ -8,12 +8,13 @@ import FinanceChart from "../components/billing/FinanceChart.jsx";
 import InvoiceForm from "../components/billing/InvoiceFormContainer.jsx";
 import GTSInvoiceForm from "../components/billing/GTSInvoiceForm.jsx";
 import ExpenseForm from "../components/billing/ExpenseForm.jsx";
-import { DollarSign, TrendingUp, TrendingDown, LayoutDashboard, Plus } from "lucide-react";
+import { DollarSign, TrendingUp, TrendingDown, LayoutDashboard, Plus, Receipt } from "lucide-react";
 import { Button } from "../components/ui/button.jsx";
 import { useToast } from "../components/ui/use-toast.jsx";
 
-export default function BillingExpenses() {
+export default function BillingExpenses({ role, structure }) {
   const { toast } = useToast();
+  const isAdmin = role === "admin";
 
   const [baticomInvoices, setBaticomInvoices] = useState([]);
   const [gtsInvoices, setGtsInvoices] = useState([]);
@@ -26,206 +27,154 @@ export default function BillingExpenses() {
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
   const [isGTSInvoiceModalOpen, setIsGTSInvoiceModalOpen] = useState(false);
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
-
-  // États de modification (Data)
   const [editingInvoice, setEditingInvoice] = useState(null);
   const [editingGTSInvoice, setEditingGTSInvoice] = useState(null);
 
   // ==========================================
-  // 1. CHARGEMENT DES DONNÉES
+  // 1. CHARGEMENT DES DONNÉES (FILTRÉ)
   // ==========================================
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const [
-        { data: invB },
-        { data: invG },
-        { data: exp },
-        { data: veh },
-      ] = await Promise.all([
-        supabase.from("invoices").select("*"),
-        supabase.from("invoices_gts").select("*"),
-        supabase.from("expenses").select("*"),
-        supabase.from("camions").select("id, immatriculation"),
-      ]);
+      if (isAdmin) {
+        // --- LOGIQUE ADMIN : TOUT RÉCUPÉRER ---
+        const [resInvB, resInvG, resExp, resVeh] = await Promise.all([
+          supabase.from("invoices").select("*"),
+          supabase.from("invoices_gts").select("*"),
+          supabase.from("expenses").select("*"),
+          supabase.from("camions").select("id, immatriculation, structure"),
+        ]);
 
-      setBaticomInvoices(invB || []);
-      setGtsInvoices(invG || []);
-      setExpenses(exp || []);
-      setCamions(veh || []);
+        const invB = resInvB.data || [];
+        const invG = resInvG.data || [];
+        const exp = resExp.data || [];
 
-      const totalInvoices =
-        (invB || []).reduce((acc, f) => acc + Number(f?.amount || 0), 0) +
-        (invG || []).reduce((acc, f) => acc + Number(f?.amount || 0), 0);
-      const totalExpenses = (exp || []).reduce((acc, d) => acc + Number(d?.amount || 0), 0);
+        setBaticomInvoices(invB);
+        setGtsInvoices(invG);
+        setExpenses(exp);
+        setCamions(resVeh.data || []);
 
-      setTotals({
-        invoices: totalInvoices,
-        expenses: totalExpenses,
-        balance: totalInvoices - totalExpenses,
-      });
+        const totalIn = invB.reduce((acc, f) => acc + Number(f?.amount || 0), 0) +
+                        invG.reduce((acc, f) => acc + Number(f?.amount || 0), 0);
+        const totalEx = exp.reduce((acc, d) => acc + Number(d?.amount || 0), 0);
+
+        setTotals({ invoices: totalIn, expenses: totalEx, balance: totalIn - totalEx });
+      } else {
+        // --- LOGIQUE SUPERVISEUR : FILTRER PAR STRUCTURE ---
+        const [resExp, resVeh] = await Promise.all([
+          supabase.from("expenses").select("*").eq("structure", structure),
+          supabase.from("camions").select("id, immatriculation, structure").eq("structure", structure),
+        ]);
+
+        const exp = resExp.data || [];
+        setExpenses(exp);
+        setCamions(resVeh.data || []);
+        
+        const totalEx = exp.reduce((acc, d) => acc + Number(d?.amount || 0), 0);
+        setTotals({ invoices: 0, expenses: totalEx, balance: 0 });
+      }
     } catch (err) {
-      console.error("Erreur fetch billing:", err);
-      toast({
-        title: "Erreur",
-        description: "Impossible de charger les données financières",
-        variant: "destructive",
-      });
+      console.error("Erreur fetch:", err);
+      toast({ title: "Erreur", description: "Impossible de charger les données", variant: "destructive" });
     } finally {
       setLoading(false);
     }
-  };
+  }, [isAdmin, structure, toast]);
 
   useEffect(() => {
     fetchData();
-  }, []);
-
-  // ==========================================
-  // 2. GESTION DES OUVERTURES (ADD / EDIT)
-  // ==========================================
-  
-  // BATICOM
-  const handleOpenBaticom = (invoice = null) => {
-    setEditingInvoice(invoice);
-    setIsInvoiceModalOpen(true);
-  };
-
-  // GTS
-  const handleOpenGTS = (invoice = null) => {
-    setEditingGTSInvoice(invoice);
-    setIsGTSInvoiceModalOpen(true);
-  };
+  }, [fetchData]);
 
   const currencyFormatter = new Intl.NumberFormat("fr-FR", {
-    style: "currency",
-    currency: "XOF",
-    minimumFractionDigits: 0,
+    style: "currency", currency: "XOF", minimumFractionDigits: 0,
   });
 
-  const StatCard = ({ title, value, colorClass, icon: Icon, description }) => (
-    <div className={`bg-white/95 dark:bg-gray-800 shadow-xl rounded-2xl p-6 border-l-4 ${colorClass}`}>
-      <div className="flex justify-between items-start">
-        <div>
-          <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">{title}</h3>
-          <p className={`mt-1 text-3xl font-extrabold ${colorClass.replace("border-l-4 ", "").replace("border-", "text-")}`}>
-            {currencyFormatter.format(value)}
-          </p>
-        </div>
-        <div className={`p-3 rounded-full ${colorClass.replace("border-l-4 border-", "bg-")} bg-opacity-10 dark:bg-opacity-20`}>
-          <Icon className={`w-6 h-6 ${colorClass.replace("border-l-4 border-", "text-")}`} />
-        </div>
-      </div>
-      {description && <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">{description}</p>}
-    </div>
-  );
+  const handleOpenBaticom = (invoice = null) => { setEditingInvoice(invoice); setIsInvoiceModalOpen(true); };
+  const handleOpenGTS = (invoice = null) => { setEditingGTSInvoice(invoice); setIsGTSInvoiceModalOpen(true); };
 
+  // ==========================================
+  // RENDER : INTERFACE SUPERVISEUR
+  // ==========================================
+  if (!isAdmin) {
+    return (
+      <div className="space-y-6 p-4">
+        <div className="flex justify-between items-center border-b pb-4 border-gray-200 dark:border-gray-700">
+          <h1 className="text-2xl font-black text-gray-800 dark:text-white flex items-center gap-2">
+            <Receipt className="text-red-600" /> Dépenses {structure}
+          </h1>
+          <Button onClick={() => setIsExpenseModalOpen(true)} className="bg-red-600 hover:bg-red-700 text-white">
+            <Plus size={18} className="mr-2" /> Ajouter une Dépense
+          </Button>
+        </div>
+
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-xl border-l-4 border-red-600 max-w-sm">
+          <h3 className="text-xs font-bold text-gray-500 uppercase">Total Dépenses</h3>
+          <p className="text-3xl font-black text-red-600">{currencyFormatter.format(totals.expenses)}</p>
+        </div>
+
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden border border-gray-100 dark:border-gray-700">
+          <ExpensesList expenses={expenses} camions={camions} refresh={fetchData} emptyMessage={`Aucune dépense pour ${structure}.`} />
+        </div>
+
+        <ExpenseForm isOpen={isExpenseModalOpen} onClose={() => setIsExpenseModalOpen(false)} refresh={fetchData} camions={camions} defaultStructure={structure} />
+      </div>
+    );
+  }
+
+  // ==========================================
+  // RENDER : INTERFACE ADMIN (COMPLÈTE)
+  // ==========================================
   return (
     <div className="space-y-8 p-2 md:p-6">
-      {/* Header & Actions */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between border-b pb-4 border-gray-200 dark:border-gray-700">
-        <h1 className="text-3xl font-extrabold text-gray-800 dark:text-gray-100 flex items-center gap-3 mb-4 md:mb-0">
-          <LayoutDashboard className="w-8 h-8 text-blue-600 dark:text-blue-400" />
-          Gestion Financière
+        <h1 className="text-3xl font-extrabold text-gray-800 dark:text-gray-100 flex items-center gap-3">
+          <LayoutDashboard className="w-8 h-8 text-blue-600" /> Gestion Financière Globale
         </h1>
-        <div className="flex gap-3 flex-wrap">
-          <Button onClick={() => handleOpenBaticom()} className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white">
-            <Plus size={18} /> Ajouter Facture BATICOM
+        <div className="flex gap-3 flex-wrap mt-4 md:mt-0">
+          <Button onClick={() => handleOpenBaticom()} className="bg-green-600 text-white hover:bg-green-700">
+            <Plus size={18} className="mr-1" /> BATICOM
           </Button>
-          <Button onClick={() => handleOpenGTS()} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white">
-            <Plus size={18} /> Ajouter Facture GTS
+          <Button onClick={() => handleOpenGTS()} className="bg-blue-600 text-white hover:bg-blue-700">
+            <Plus size={18} className="mr-1" /> GTS
           </Button>
-          <Button onClick={() => setIsExpenseModalOpen(true)} className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white">
-            <Plus size={18} /> Ajouter Dépense
+          <Button onClick={() => setIsExpenseModalOpen(true)} className="bg-red-600 text-white hover:bg-red-700">
+            <Plus size={18} className="mr-1" /> Dépense
           </Button>
         </div>
       </div>
 
-      {/* Cartes synthèse */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        <StatCard title="Total Factures" value={totals.invoices} colorClass="border-green-600" icon={TrendingUp} description="Total des revenus facturés." />
-        <StatCard title="Total Dépenses" value={totals.expenses} colorClass="border-red-600" icon={TrendingDown} description="Somme des dépenses." />
-        <StatCard title="Solde Net" value={totals.balance} colorClass={totals.balance >= 0 ? "border-blue-600" : "border-red-600"} icon={DollarSign} description="Factures - Dépenses." />
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-lg border-l-4 border-green-600">
+          <h3 className="text-xs font-bold text-gray-500 uppercase">Total Revenus</h3>
+          <p className="text-2xl font-black text-green-600">{currencyFormatter.format(totals.invoices)}</p>
+        </div>
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-lg border-l-4 border-red-600">
+          <h3 className="text-xs font-bold text-gray-500 uppercase">Total Dépenses</h3>
+          <p className="text-2xl font-black text-red-600">{currencyFormatter.format(totals.expenses)}</p>
+        </div>
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-lg border-l-4 border-blue-600">
+          <h3 className="text-xs font-bold text-gray-500 uppercase">Solde Net</h3>
+          <p className="text-2xl font-black text-blue-600">{currencyFormatter.format(totals.balance)}</p>
+        </div>
       </div>
 
-      {/* Graphique */}
-      <div className="bg-white/95 dark:bg-gray-800 rounded-2xl shadow-2xl p-6">
-        <h3 className="text-xl font-bold mb-4 text-gray-800 dark:text-gray-100">Aperçu Financier</h3>
-        {loading ? <p>Chargement...</p> : <FinanceChart invoices={[...baticomInvoices, ...gtsInvoices]} expenses={expenses} />}
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6">
+        <h3 className="text-xl font-bold mb-4">Aperçu Financier</h3>
+        {!loading && <FinanceChart invoices={[...baticomInvoices, ...gtsInvoices]} expenses={expenses} />}
       </div>
 
-      {/* Tabs Factures / Dépenses */}
       <Tabs
         defaultValue="baticom"
         tabs={[
-          {
-            label: "Factures BATICOM",
-            value: "baticom",
-            content: <InvoicesList
-              invoices={baticomInvoices}
-              type="baticom"
-              onEdit={handleOpenBaticom}
-              onDelete={async (id) => {
-                await supabase.from("invoices").delete().eq("id", id);
-                fetchData();
-              }}
-              emptyMessage="Aucune facture BATICOM pour le moment."
-            />,
-          },
-          {
-            label: "Factures GTS",
-            value: "gts",
-            content: <GTSInvoicesList
-              invoices={gtsInvoices}
-              onEdit={handleOpenGTS}
-              refresh={fetchData}
-            />,
-          },
-          {
-            label: "Dépenses",
-            value: "expenses",
-            content: <ExpensesList
-              expenses={expenses}
-              camions={camions}
-              refresh={fetchData}
-              emptyMessage="Aucune dépense enregistrée."
-            />,
-          },
+          { label: "BATICOM", value: "baticom", content: <InvoicesList invoices={baticomInvoices} type="baticom" onEdit={handleOpenBaticom} refresh={fetchData} /> },
+          { label: "GTS Logistics", value: "gts", content: <GTSInvoicesList invoices={gtsInvoices} onEdit={handleOpenGTS} refresh={fetchData} /> },
+          { label: "Dépenses Globales", value: "expenses", content: <ExpensesList expenses={expenses} camions={camions} refresh={fetchData} /> },
         ]}
       />
 
-      {/* ==========================================
-          MODALS AVEC NETTOYAGE AU CLOSE
-      ========================================== */}
-      
-      {/* Modal BATICOM */}
-      <InvoiceForm 
-        isOpen={isInvoiceModalOpen} 
-        onClose={() => {
-          setIsInvoiceModalOpen(false);
-          setEditingInvoice(null);
-        }} 
-        refresh={fetchData} 
-        initialData={editingInvoice} 
-      />
-
-      {/* Modal GTS */}
-      <GTSInvoiceForm 
-        isOpen={isGTSInvoiceModalOpen} 
-        onClose={() => {
-          setIsGTSInvoiceModalOpen(false);
-          setEditingGTSInvoice(null);
-        }} 
-        refresh={fetchData} 
-        initialData={editingGTSInvoice} 
-      />
-
-      {/* Modal Dépense */}
-      <ExpenseForm 
-        isOpen={isExpenseModalOpen} 
-        onClose={() => setIsExpenseModalOpen(false)} 
-        refresh={fetchData} 
-        camions={camions} 
-      />
+      <InvoiceForm isOpen={isInvoiceModalOpen} onClose={() => {setIsInvoiceModalOpen(false); setEditingInvoice(null);}} refresh={fetchData} initialData={editingInvoice} />
+      <GTSInvoiceForm isOpen={isGTSInvoiceModalOpen} onClose={() => {setIsGTSInvoiceModalOpen(false); setEditingGTSInvoice(null);}} refresh={fetchData} initialData={editingGTSInvoice} />
+      <ExpenseForm isOpen={isExpenseModalOpen} onClose={() => setIsExpenseModalOpen(false)} refresh={fetchData} camions={camions} />
     </div>
   );
 }

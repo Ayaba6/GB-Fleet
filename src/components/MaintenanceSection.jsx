@@ -1,19 +1,19 @@
 import React, { useState, useEffect } from "react";
 import { supabase } from "../config/supabaseClient.js";
-import { Loader2, Plus, Wrench, Droplet } from "lucide-react";
+import { Loader2, Plus, Wrench, Droplet, CarFront } from "lucide-react";
 import { Button } from "./ui/button.jsx";
-import { useToast } from "./ui/use-toast.jsx";
+import { toast } from "react-hot-toast"; // Utilisation de react-hot-toast pour cohérence avec le dashboard
 
 const MAINTENANCE_TYPES = {
     VIDANGE: "vidange",
     REPARATION: "reparation",
 };
 
-export default function MaintenanceSection({ camions }) {
-    const { toast } = useToast();
+export default function MaintenanceSection({ camions = [] }) {
     const [selectedCamion, setSelectedCamion] = useState(null);
     const [maintenances, setMaintenances] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     const [type, setType] = useState(MAINTENANCE_TYPES.VIDANGE);
     const [description, setDescription] = useState("");
@@ -32,211 +32,181 @@ export default function MaintenanceSection({ camions }) {
             if (error) throw error;
             setMaintenances(data || []);
         } catch (err) {
-            toast({
-                title: "Erreur de chargement",
-                description: err.message,
-                variant: "destructive",
-            });
+            console.error("Erreur maintenance:", err.message);
+            toast.error("Impossible de charger l'historique");
         } finally {
             setLoading(false);
         }
     };
 
     useEffect(() => {
-        if (selectedCamion) fetchMaintenances(selectedCamion.id);
-        else setMaintenances([]);
+        if (selectedCamion?.id) {
+            fetchMaintenances(selectedCamion.id);
+        } else {
+            setMaintenances([]);
+        }
     }, [selectedCamion]);
 
     const handleAdd = async () => {
-        if (!selectedCamion || !description || !date) {
-            toast({
-                title: "Erreur",
-                description: "Veuillez remplir la description et la date.",
-                variant: "destructive",
-            });
+        if (!selectedCamion || !description.trim() || !date) {
+            toast.error("Veuillez remplir tous les champs.");
             return;
         }
 
+        setIsSubmitting(true);
         try {
+            // On récupère la structure du camion pour l'enregistrer avec la maintenance
             const { data, error } = await supabase
                 .from("maintenance")
-                .insert([{ camion_id: selectedCamion.id, type, description, date }])
+                .insert([{ 
+                    camion_id: selectedCamion.id, 
+                    type, 
+                    description: description.trim(), 
+                    date,
+                    structure: selectedCamion.structure // Liaison importante pour le futur
+                }])
                 .select();
 
             if (error) throw error;
 
             setMaintenances((prev) => [data[0], ...prev]);
             setDescription("");
-
-            toast({
-                title: "Ajouté",
-                description: "Maintenance enregistrée avec succès.",
-                variant: "success",
-            });
+            toast.success("Maintenance enregistrée");
         } catch (err) {
-            toast({
-                title: "Erreur d'ajout",
-                description: err.message,
-                variant: "destructive",
-            });
+            toast.error("Erreur lors de l'enregistrement");
+            console.error(err);
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
     return (
-        <div className="space-y-6 w-full p-4 md:p-6 bg-white dark:bg-gray-900 rounded-xl shadow-lg">
-
-            <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-6 flex items-center gap-2 border-b pb-3 border-gray-200 dark:border-gray-800">
-                <Wrench size={24} className="text-blue-600 dark:text-blue-400" />
-                Gestion Maintenance du Parc
-            </h2>
+        <div className="space-y-6 w-full animate-in fade-in duration-500">
+            {/* Header */}
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
+                <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100 flex items-center gap-2">
+                    <Wrench size={24} className="text-blue-600" />
+                    Maintenance du Parc {selectedCamion?.structure ? `(${selectedCamion.structure})` : ""}
+                </h2>
+                <p className="text-sm text-gray-500 mt-1">Gérez les vidanges et réparations de vos véhicules</p>
+            </div>
 
             {/* Sélection camion */}
-            <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-6 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-                <label className="font-semibold text-gray-700 dark:text-gray-300 min-w-[150px]">
-                    Sélectionner un camion :
-                </label>
+            <div className="flex flex-col md:flex-row gap-4 items-center bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
+                <div className="flex items-center gap-3 w-full md:w-auto">
+                    <CarFront className="text-gray-400" size={20} />
+                    <label className="font-bold text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                        Véhicule :
+                    </label>
+                </div>
 
                 <select
                     value={selectedCamion?.id || ""}
-                    onChange={(e) =>
-                        setSelectedCamion(camions.find((c) => c.id === e.target.value))
-                    }
-                    className="p-2 border border-gray-300 rounded-md shadow-sm
-                               bg-white text-gray-900 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
+                    onChange={(e) => setSelectedCamion(camions.find((c) => c.id === e.target.value))}
+                    className="w-full p-3 border border-gray-200 rounded-xl bg-gray-50 dark:bg-gray-700 dark:border-gray-600 text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
                 >
-                    <option value="">-- Sélectionnez un camion --</option>
+                    <option value="">-- Choisissez un véhicule --</option>
                     {camions.map((c) => (
                         <option key={c.id} value={c.id}>
-                            {c.immatriculation} ({c.type})
+                            {c.immatriculation} - {c.marquemodele || c.type || "Camion"}
                         </option>
                     ))}
                 </select>
             </div>
 
-            {!selectedCamion && (
-                <div className="text-gray-500 dark:text-gray-400 py-20 text-center border border-dashed rounded-lg">
-                    Veuillez sélectionner un camion pour afficher la maintenance.
+            {!selectedCamion ? (
+                <div className="bg-blue-50/50 dark:bg-blue-900/10 border-2 border-dashed border-blue-200 dark:border-blue-800 py-20 text-center rounded-2xl">
+                    <Wrench className="mx-auto text-blue-300 mb-4" size={48} />
+                    <p className="text-blue-600 dark:text-blue-400 font-medium">Sélectionnez un camion pour gérer sa maintenance.</p>
                 </div>
-            )}
-
-            {selectedCamion && (
-                <>
-                    {/* Formulaire ajout */}
-                    <div className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800/50 shadow-inner">
-                        <h3 className="font-bold text-lg mb-4 text-gray-800 dark:text-gray-100 flex items-center gap-2">
-                            <Plus size={18} className="text-green-600 dark:text-green-500" />
-                            Enregistrer une nouvelle intervention
+            ) : (
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    
+                    {/* Formulaire d'ajout */}
+                    <div className="lg:col-span-1 space-y-4 bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 h-fit">
+                        <h3 className="font-bold flex items-center gap-2 text-gray-800 dark:text-white">
+                            <Plus size={18} className="text-green-500" />
+                            Nouvelle Entrée
                         </h3>
-
-                        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 md:items-end">
+                        
+                        <div className="space-y-4">
                             <div>
-                                <label className="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">
-                                    Type
-                                </label>
+                                <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Type d'intervention</label>
                                 <select
                                     value={type}
                                     onChange={(e) => setType(e.target.value)}
-                                    className="p-2 border border-gray-300 rounded-md bg-white text-gray-900 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 w-full"
+                                    className="w-full p-2.5 border rounded-lg dark:bg-gray-900 dark:border-gray-700"
                                 >
                                     <option value={MAINTENANCE_TYPES.VIDANGE}>Vidange</option>
                                     <option value={MAINTENANCE_TYPES.REPARATION}>Réparation</option>
                                 </select>
                             </div>
 
-                            <div className="md:col-span-2">
-                                <label className="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">
-                                    Description
-                                </label>
-                                <input
-                                    type="text"
+                            <div>
+                                <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Description</label>
+                                <textarea
                                     value={description}
                                     onChange={(e) => setDescription(e.target.value)}
-                                    placeholder="Ex: Remplacement filtre à huile"
-                                    className="p-2 border border-gray-300 rounded-md bg-white text-gray-900 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 w-full"
+                                    placeholder="Détails de l'intervention..."
+                                    className="w-full p-2.5 border rounded-lg dark:bg-gray-900 dark:border-gray-700 min-h-[100px]"
                                 />
                             </div>
 
                             <div>
-                                <label className="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">
-                                    Date
-                                </label>
+                                <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Date</label>
                                 <input
                                     type="date"
                                     value={date}
                                     onChange={(e) => setDate(e.target.value)}
-                                    className="p-2 border border-gray-300 rounded-md bg-white text-gray-900 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 w-full"
+                                    className="w-full p-2.5 border rounded-lg dark:bg-gray-900 dark:border-gray-700"
                                 />
                             </div>
 
                             <Button
                                 onClick={handleAdd}
-                                disabled={loading}
-                                className="w-full md:w-auto h-auto px-4 py-2 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white flex items-center gap-2"
+                                disabled={isSubmitting}
+                                className="w-full bg-blue-600 hover:bg-blue-700 text-white py-6 rounded-xl font-bold"
                             >
-                                <Plus size={16} /> Enregistrer
+                                {isSubmitting ? <Loader2 className="animate-spin" /> : "Enregistrer"}
                             </Button>
                         </div>
                     </div>
 
-                    {/* Liste */}
-                    <div className="mt-6">
-                        <h3 className="font-bold text-lg mb-3 text-gray-800 dark:text-gray-100">
-                            Historique des interventions ({maintenances.length})
+                    {/* Historique */}
+                    <div className="lg:col-span-2 bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
+                        <h3 className="font-bold mb-4 flex justify-between items-center text-gray-800 dark:text-white">
+                            <span>Historique {selectedCamion.immatriculation}</span>
+                            <span className="text-xs bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded text-gray-500">
+                                {maintenances.length} intervention(s)
+                            </span>
                         </h3>
 
                         {loading ? (
-                            <div className="flex justify-center py-12">
-                                <Loader2 className="h-10 w-10 animate-spin text-blue-600 dark:text-blue-400" />
-                            </div>
+                            <div className="flex justify-center py-20"><Loader2 className="animate-spin text-blue-600" /></div>
                         ) : maintenances.length === 0 ? (
-                            <div className="text-gray-500 dark:text-gray-400 py-10 text-center border rounded-lg">
-                                Aucune maintenance enregistrée.
-                            </div>
+                            <div className="text-center py-20 text-gray-400 border border-dashed rounded-xl">Aucune donnée</div>
                         ) : (
-                            <div className="overflow-x-auto shadow-md rounded-lg border border-gray-300 dark:border-gray-700">
-                                <table className="min-w-full text-sm text-left">
-                                    <thead className="text-xs uppercase bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300">
-                                        <tr>
-                                            <th className="p-3 border-r border-gray-300 dark:border-gray-600 w-1/5">
-                                                Type
-                                            </th>
-                                            <th className="p-3 border-r border-gray-300 dark:border-gray-600 w-3/5">
-                                                Description
-                                            </th>
-                                            <th className="p-3 w-1/5">Date</th>
-                                        </tr>
-                                    </thead>
-
-                                    <tbody className="text-gray-900 dark:text-gray-200">
-                                        {maintenances.map((m) => (
-                                            <tr
-                                                key={m.id}
-                                                className="border-b border-gray-200 dark:border-gray-700 even:bg-gray-50 dark:even:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700"
-                                            >
-                                                <td className="p-3 flex items-center gap-2 border-r border-gray-200 dark:border-gray-700 font-medium">
-                                                    {m.type === MAINTENANCE_TYPES.VIDANGE ? (
-                                                        <Droplet size={16} className="text-amber-600 dark:text-amber-400" />
-                                                    ) : (
-                                                        <Wrench size={16} className="text-red-600 dark:text-red-400" />
-                                                    )}
-                                                    {m.type.charAt(0).toUpperCase() + m.type.slice(1)}
-                                                </td>
-
-                                                <td className="p-3 border-r border-gray-200 dark:border-gray-700">
-                                                    {m.description}
-                                                </td>
-
-                                                <td className="p-3 font-mono">
-                                                    {m.date}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
+                            <div className="space-y-3">
+                                {maintenances.map((m) => (
+                                    <div key={m.id} className="flex items-center justify-between p-4 border border-gray-50 dark:border-gray-700 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                                        <div className="flex items-center gap-4">
+                                            <div className={`p-2 rounded-lg ${m.type === 'vidange' ? 'bg-amber-100 text-amber-600' : 'bg-red-100 text-red-600'}`}>
+                                                {m.type === 'vidange' ? <Droplet size={20} /> : <Wrench size={20} />}
+                                            </div>
+                                            <div>
+                                                <p className="font-bold text-sm dark:text-white">{m.description}</p>
+                                                <p className="text-xs text-gray-500 uppercase font-mono">{m.type}</p>
+                                            </div>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-sm font-bold text-gray-700 dark:text-gray-300">{new Date(m.date).toLocaleDateString()}</p>
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
                         )}
                     </div>
-                </>
+                </div>
             )}
         </div>
     );
