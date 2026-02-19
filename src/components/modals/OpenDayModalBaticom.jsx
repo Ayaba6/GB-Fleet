@@ -5,7 +5,7 @@ import { useToast } from "../../components/ui/use-toast.jsx";
 import { Loader2, X, Truck, User, Fuel } from "lucide-react";
 
 const BASE_INPUT_STYLE =
-  "w-full border rounded-lg p-2.5 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 border-gray-300 dark:border-gray-600 focus:ring-indigo-500 focus:border-indigo-500 transition-colors";
+  "w-full border rounded-lg p-2.5 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 border-gray-300 dark:border-gray-600 focus:ring-indigo-500 focus:border-indigo-500 transition-colors text-sm md:text-base";
 
 export default function OpenDayModalBaticom({
   setShowModal,
@@ -21,7 +21,6 @@ export default function OpenDayModalBaticom({
   const [loading, setLoading] = useState(false);
   const [formError, setFormError] = useState(null);
 
-  // Filtrer camions disponibles BATICOM
   const baticomCamions = camions.filter(
     (c) => c.structure === "BATICOM" && c.statut === "Disponible"
   );
@@ -29,35 +28,25 @@ export default function OpenDayModalBaticom({
 
   const handleCreate = async () => {
     setFormError(null);
-
     if (!chauffeurId || !camionId) {
       setFormError("Veuillez sélectionner un chauffeur et un camion.");
       return;
     }
-
     setLoading(true);
 
     try {
-      // Vérifier si une journée existante
       const { data: existing, error: checkError } = await supabase
         .from("journee_baticom")
         .select("id")
-        .match({
-          chauffeur_id: chauffeurId,
-          statut: "affectée",
-        });
+        .match({ chauffeur_id: chauffeurId, statut: "affectée" });
 
       if (checkError) throw new Error(checkError.message);
-
       if (existing?.length > 0) {
-        setFormError(
-          "Ce chauffeur a déjà une journée affectée. Veuillez la clôturer avant d’en créer une nouvelle."
-        );
+        setFormError("Ce chauffeur a déjà une journée affectée. Veuillez la clôturer.");
         setLoading(false);
         return;
       }
 
-      // Créer la journée avec statut "affectée"
       const { error: insertError } = await supabase.from("journee_baticom").insert([
         {
           chauffeur_id: chauffeurId,
@@ -72,34 +61,13 @@ export default function OpenDayModalBaticom({
 
       if (insertError) throw insertError;
 
-      // Mettre le camion en mission
-      const { error: updateCamionError } = await supabase
-        .from("camions")
-        .update({ statut: "En mission" })
-        .eq("id", camionId);
+      await supabase.from("camions").update({ statut: "En mission" }).eq("id", camionId);
 
-      if (updateCamionError) {
-        toast({
-          title: "Alerte",
-          description: "Journée créée mais impossible de modifier le statut du camion.",
-          variant: "warning",
-        });
-      }
-
-      toast({
-        title: "🎉 Journée Affectée",
-        description: "La journée BATICOM a été assignée avec succès.",
-      });
-
+      toast({ title: "🎉 Journée Affectée", description: "Succès !" });
       setShowModal(false);
       fetchJournees();
     } catch (error) {
       setFormError(error.message);
-      toast({
-        title: "❌ Erreur",
-        description: error.message,
-        variant: "destructive",
-      });
     } finally {
       setLoading(false);
     }
@@ -107,128 +75,118 @@ export default function OpenDayModalBaticom({
 
   return (
     <div
-      className="fixed inset-0 bg-black/70 flex items-center justify-center z-[100] p-4 backdrop-blur-sm"
+      className="fixed inset-0 bg-black/70 flex items-center justify-center z-[100] p-2 md:p-4 backdrop-blur-sm"
       onClick={() => setShowModal(false)}
     >
       <div
-        className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-6 w-full max-w-lg space-y-6 transform transition-all duration-300 scale-100"
+        className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-[95%] max-w-lg flex flex-col max-h-[90vh] overflow-hidden transform transition-all"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* HEADER */}
-        <div className="flex justify-between items-center border-b dark:border-gray-700 pb-3">
-          <h2 className="text-xl md:text-2xl font-bold text-indigo-600 dark:text-indigo-400 flex items-center gap-2">
-            <User className="w-6 h-6" /> Ouvrir Journée BATICOM
+        {/* HEADER - Fixe */}
+        <div className="flex justify-between items-center border-b dark:border-gray-700 p-4 md:p-6">
+          <h2 className="text-lg md:text-2xl font-bold text-indigo-600 dark:text-indigo-400 flex items-center gap-2">
+            <User className="w-5 h-5 md:w-6 md:h-6" /> <span className="truncate">Ouvrir Journée BATICOM</span>
           </h2>
-
-          <Button
-            variant="ghost"
+          <button
             onClick={() => setShowModal(false)}
-            className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full"
+            className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
           >
-            <X className="w-6 h-6 text-gray-500 dark:text-gray-400" />
-          </Button>
+            <X className="w-5 h-5 text-gray-500" />
+          </button>
         </div>
 
-        {/* Erreur */}
-        {formError && (
-          <div className="p-3 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-lg text-sm border border-red-300 dark:border-red-700">
-            {formError}
-          </div>
-        )}
+        {/* CONTENT - Scrollable */}
+        <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-5">
+          {formError && (
+            <div className="p-3 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded-lg text-xs md:text-sm border border-red-200 dark:border-red-800">
+              {formError}
+            </div>
+          )}
 
-        {/* FORM */}
-        <div className="flex flex-col gap-5">
-          {/* Chauffeur */}
-          <div className="space-y-1">
-            <label className="block font-medium text-gray-700 dark:text-gray-200 flex items-center gap-2">
-              <User size={18} className="text-indigo-500" /> Chauffeur
-            </label>
-            <select
-              value={chauffeurId}
-              onChange={(e) => setChauffeurId(e.target.value)}
-              className={BASE_INPUT_STYLE}
-            >
-              <option value="">-- Sélectionner un chauffeur BATICOM --</option>
-              {baticomChauffeurs.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Camion */}
-          <div className="space-y-1">
-            <label className="block font-medium text-gray-700 dark:text-gray-200 flex items-center gap-2">
-              <Truck size={18} className="text-indigo-500" /> Camion
-            </label>
-            <select
-              value={camionId}
-              onChange={(e) => setCamionId(e.target.value)}
-              className={BASE_INPUT_STYLE}
-            >
-              <option value="">-- Sélectionner un camion BATICOM disponible --</option>
-              {baticomCamions.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.immatriculation} ({c.marquemodele})
-                </option>
-              ))}
-            </select>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              Seuls les camions BATICOM avec le statut "Disponible" sont affichés.
-            </p>
-          </div>
-
-          {/* Fuel */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t dark:border-gray-700">
-            <div className="space-y-1">
-              <label className="block font-medium text-gray-700 dark:text-gray-200 flex items-center gap-2">
-                <Fuel size={18} className="text-green-500" /> Fuel restant (L)
+          <div className="space-y-4">
+            {/* Chauffeur */}
+            <div className="space-y-1.5">
+              <label className="text-sm font-semibold text-gray-700 dark:text-gray-200 flex items-center gap-2">
+                <User size={16} className="text-indigo-500" /> Chauffeur
               </label>
-              <input
-                type="number"
-                value={fuelRestant}
-                onChange={(e) => setFuelRestant(e.target.value)}
+              <select
+                value={chauffeurId}
+                onChange={(e) => setChauffeurId(e.target.value)}
                 className={BASE_INPUT_STYLE}
-                placeholder="Litres restants"
-              />
+              >
+                <option value="">Sélectionner chauffeur...</option>
+                {baticomChauffeurs.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
             </div>
 
-            <div className="space-y-1">
-              <label className="block font-medium text-gray-700 dark:text-gray-200 flex items-center gap-2">
-                <Fuel size={18} className="text-yellow-500" /> Fuel complément (L)
+            {/* Camion */}
+            <div className="space-y-1.5">
+              <label className="text-sm font-semibold text-gray-700 dark:text-gray-200 flex items-center gap-2">
+                <Truck size={16} className="text-indigo-500" /> Camion
               </label>
-              <input
-                type="number"
-                value={fuelComplement}
-                onChange={(e) => setFuelComplement(e.target.value)}
+              <select
+                value={camionId}
+                onChange={(e) => setCamionId(e.target.value)}
                 className={BASE_INPUT_STYLE}
-                placeholder="Litres ajoutés"
-              />
+              >
+                <option value="">Sélectionner camion...</option>
+                {baticomCamions.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.immatriculation} ({c.marquemodele})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Fuel - Grid responsive */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+              <div className="space-y-1.5">
+                <label className="text-sm font-semibold text-gray-700 dark:text-gray-200 flex items-center gap-2">
+                  <Fuel size={16} className="text-green-500" /> Fuel restant (L)
+                </label>
+                <input
+                  type="number"
+                  value={fuelRestant}
+                  onChange={(e) => setFuelRestant(e.target.value)}
+                  className={BASE_INPUT_STYLE}
+                  placeholder="0"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-sm font-semibold text-gray-700 dark:text-gray-200 flex items-center gap-2">
+                  <Fuel size={16} className="text-yellow-500" /> Fuel complément (L)
+                </label>
+                <input
+                  type="number"
+                  value={fuelComplement}
+                  onChange={(e) => setFuelComplement(e.target.value)}
+                  className={BASE_INPUT_STYLE}
+                  placeholder="0"
+                />
+              </div>
             </div>
           </div>
         </div>
 
-        {/* ACTION BUTTONS */}
-        <div className="flex justify-end gap-3 pt-4 border-t dark:border-gray-700">
+        {/* FOOTER - Fixe */}
+        <div className="p-4 md:p-6 border-t dark:border-gray-700 flex flex-col-reverse sm:flex-row gap-3 bg-gray-50 dark:bg-gray-800/50">
           <Button
-            type="button"
+            variant="outline"
             onClick={() => setShowModal(false)}
-            className="bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 !text-black dark:text-white border border-gray-300 dark:border-gray-600"
+            className="w-full sm:w-auto dark:text-white"
           >
             Annuler
           </Button>
-
           <Button
-            className="bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 text-white"
+            className="w-full sm:flex-1 bg-indigo-600 hover:bg-indigo-700 text-white"
             onClick={handleCreate}
             disabled={loading || !chauffeurId || !camionId}
           >
             {loading ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Ouverture en cours...
-              </>
+              <Loader2 className="w-4 h-4 animate-spin" />
             ) : (
               "Ouvrir la journée"
             )}

@@ -220,9 +220,7 @@ export default function SuperviseurDashboardBaticom() {
                {SECTION_TITLES[section]}
             </h2>
           </div>
-          <div className="px-3 py-1 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 text-[10px] font-black tracking-widest uppercase">
-            Secteur Baticom
-          </div>
+          
         </header>
 
         <div className="flex-1 overflow-y-auto p-4 md:p-8">
