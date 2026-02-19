@@ -4,16 +4,8 @@ import { supabase } from "../config/supabaseClient.js";
 import { Toaster, toast } from "react-hot-toast";
 
 import {
-  Users,
-  Truck,
-  ClipboardList,
-  AlertTriangle,
-  FileWarning,
-  Sun,
-  Moon,
-  Menu,
-  Loader2,
-  GaugeCircle
+  Users, Truck, ClipboardList, AlertTriangle, FileWarning,
+  Sun, Moon, Menu, Loader2, GaugeCircle
 } from "lucide-react";
 
 import AdminSidebar from "../components/AdminSidebar.jsx";
@@ -77,6 +69,15 @@ export default function AdminDashboard() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
 
+  const playNotificationSound = () => {
+    try {
+      const audio = new Audio("https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3");
+      audio.play();
+    } catch (error) {
+      console.error("Erreur sonore :", error);
+    }
+  };
+
   useEffect(() => {
     const stored = localStorage.getItem("darkMode");
     const initial = stored ? stored === "true" : window.matchMedia("(prefers-color-scheme: dark)").matches;
@@ -96,36 +97,50 @@ export default function AdminDashboard() {
 
       const { data: profile } = await supabase.from("profiles").select("*").eq("id", authUser.id).single();
       
-      // Ici on autorise Admin ET Superviseur (si tu utilises le même dashboard pour les deux)
       if (!profile || (profile.role !== "admin" && profile.role !== "superviseur")) {
         await supabase.auth.signOut();
         return navigate("/login");
       }
       
+      const userRole = profile.role;
+      const userStructure = profile.structure;
+      const isAdmin = userRole === "admin";
+
       setUser({ 
         ...authUser, 
         full_name: profile.full_name || authUser.email, 
         avatar: profile.avatar_url,
-        role: profile.role,        // INDISPENSABLE : on stocke le rôle
-        structure: profile.structure // INDISPENSABLE : on stocke la structure
+        role: userRole,
+        structure: userStructure
       });
 
       const activeStatus = ["En cours", "En chargement", "En dechargement"];
 
+      // --- FILTRAGE SQL PAR STRUCTURE ---
+      let profilesQuery = supabase.from("profiles").select("id, cnib_expiration, permis_expiration, carte_expiration, structure");
+      let camionsQuery = supabase.from("camions").select("*, structure");
+
+      if (!isAdmin && userStructure) {
+        profilesQuery = profilesQuery.eq("structure", userStructure);
+        camionsQuery = camionsQuery.eq("structure", userStructure);
+      }
+
       const [usersRes, camionsRes, missionsBaticomRes, missionsGtsRes, panneEnCoursRes] = await Promise.all([
-        supabase.from("profiles").select("id, cnib_expiration, permis_expiration, carte_expiration"),
-        supabase.from("camions").select("*"),
+        profilesQuery,
+        camionsQuery,
         supabase.from("journee_baticom").select("statut").in("statut", activeStatus),
         supabase.from("missions_gts").select("statut").in("statut", activeStatus),
         supabase.from("alertespannes").select("id").eq("statut", "en_cours")
       ]);
 
+      // --- CALCUL DES DOCUMENTS (Logique J-15) ---
       const today = new Date();
       let docsUrgentsCount = 0;
+
       const checkDate = (dateStr) => {
         if (!dateStr) return false;
         const diff = Math.ceil((new Date(dateStr) - today) / (1000 * 60 * 60 * 24));
-        return diff >= 0 && diff <= 15;
+        return diff <= 15; 
       };
 
       usersRes.data?.forEach(p => {
@@ -140,12 +155,20 @@ export default function AdminDashboard() {
         if (checkDate(c.visitetechniqueexpiry)) docsUrgentsCount++;
       });
 
-      setStats({
-        users: usersRes.data?.length || 0,
-        camions: camionsRes.data?.length || 0,
-        missions: (missionsBaticomRes.data?.length || 0) + (missionsGtsRes.data?.length || 0),
-        pannes: panneEnCoursRes.data?.length || 0,
-        docs: docsUrgentsCount
+      // --- MISE À JOUR STATS & NOTIFICATIONS ---
+      setStats(prev => {
+        // Notifier si le nombre de docs augmente
+        if (docsUrgentsCount > prev.docs && prev.docs !== 0) {
+          playNotificationSound();
+          toast.error("Nouvelle alerte document détectée !", { icon: "📅" });
+        }
+        return {
+          users: usersRes.data?.length || 0,
+          camions: camionsRes.data?.length || 0,
+          missions: (missionsBaticomRes.data?.length || 0) + (missionsGtsRes.data?.length || 0),
+          pannes: panneEnCoursRes.data?.length || 0,
+          docs: docsUrgentsCount
+        };
       });
 
       setHasPanneEnCours((panneEnCoursRes.data || []).length > 0);
@@ -163,17 +186,22 @@ export default function AdminDashboard() {
     fetchData();
   }, [fetchData]);
 
+  // --- REALTIME ---
   useEffect(() => {
     const channel = supabase
       .channel("dashboard-realtime")
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "alertespannes" }, () => {
-        toast.error(`Nouvelle panne signalée !`, {
-          duration: 5000,
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "alertespannes" }, (payload) => {
+        playNotificationSound();
+        toast.error(`Nouvelle panne détectée !`, {
+          duration: 6000,
           icon: '⚠️',
-          style: { borderRadius: '10px', background: '#333', color: '#fff' },
+          style: { borderRadius: '12px', background: '#ef4444', color: '#fff', fontWeight: 'bold' },
         });
         fetchData();
       })
+      // Surveillance des changements sur les camions et profils pour les dates
+      .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, fetchData)
+      .on("postgres_changes", { event: "*", schema: "public", table: "camions" }, fetchData)
       .on("postgres_changes", { event: "*", schema: "public", table: "alertespannes" }, fetchData)
       .on("postgres_changes", { event: "*", schema: "public", table: "journee_baticom" }, fetchData)
       .on("postgres_changes", { event: "*", schema: "public", table: "missions_gts" }, fetchData)
@@ -261,17 +289,10 @@ export default function AdminDashboard() {
                 {section === "users" && <UserSection />}
                 {section === "camions" && <CamionsSection />}
                 {section === "missions" && <MissionsSection />}
-                {section === "pannes" && <PannesDeclarees />}
+                {section === "pannes" && <PannesDeclarees role={user?.role} structure={user?.structure} />}
                 {section === "maintenance" && <MaintenanceSection camions={camions} />}
-                {section === "documents" && <AlertesExpiration />}
-                
-                {/* MODIFICATION ICI : Transmission des props au composant Billing */}
-                {section === "billing" && (
-                  <BillingExpenses 
-                    role={user?.role} 
-                    structure={user?.structure} 
-                  />
-                )}
+                {section === "documents" && <AlertesExpiration role={user?.role} structure={user?.structure} />}
+                {section === "billing" && <BillingExpenses role={user?.role} structure={user?.structure} />}
               </div>
             )}
           </div>
