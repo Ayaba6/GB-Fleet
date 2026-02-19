@@ -16,7 +16,7 @@ import AlertesDocuments from "../components/AlertesExpiration.jsx";
 import BillingExpenses from "../components/BillingExpenses.jsx";
 import CarteFlotte from "../components/CarteFlotte.jsx";
 
-// --- UI COMPONENTS ---
+// ... (Composants Card et StatCard identiques)
 const Card = ({ className = "", children }) => <div className={`rounded-xl ${className}`}>{children}</div>;
 const CardHeader = ({ className = "", children }) => <div className={`p-4 ${className}`}>{children}</div>;
 const CardContent = ({ className = "", children }) => <div className={`p-4 ${className}`}>{children}</div>;
@@ -54,9 +54,33 @@ export default function SuperviseurDashboardGTS() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
 
+  // --- AUDIO LOGIC ---
   const audioRef = useRef(new Audio("https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3"));
 
-  // --- DARK MODE LOGIC ---
+  // Fonction pour jouer le son en toute sécurité
+  const playAlertSound = useCallback(() => {
+    if (audioRef.current) {
+      audioRef.current.currentTime = 0; // Recommencer au début
+      audioRef.current.play().catch(err => {
+        console.warn("L'audio n'a pas pu être joué (attente interaction utilisateur)");
+      });
+    }
+  }, []);
+
+  // Débloquer l'audio au premier clic sur la page
+  useEffect(() => {
+    const unlockAudio = () => {
+      audioRef.current.play().then(() => {
+        audioRef.current.pause(); // Jouer et mettre en pause immédiatement pour "débloquer"
+        audioRef.current.currentTime = 0;
+      }).catch(() => {});
+      window.removeEventListener('click', unlockAudio);
+    };
+    window.addEventListener('click', unlockAudio);
+    return () => window.removeEventListener('click', unlockAudio);
+  }, []);
+
+  // ... (Dark mode identique)
   useEffect(() => {
     const stored = localStorage.getItem("darkMode");
     const initial = stored ? stored === "true" : window.matchMedia("(prefers-color-scheme: dark)").matches;
@@ -71,7 +95,6 @@ export default function SuperviseurDashboardGTS() {
     localStorage.setItem("darkMode", mode);
   };
 
-  // --- NAVIGATION ET FERMETURE DU MENU ---
   const handleSectionChange = (id) => {
     setSection(id);
     setIsMobileMenuOpen(false);
@@ -110,9 +133,16 @@ export default function SuperviseurDashboardGTS() {
         if (isRed(c.visitetechniqueexpiry)) redDocsCount++;
       });
 
+      const newPannesCount = pannesRes.count || 0;
+
+      // Alerte sonore si nouvelles pannes ou docs rouges
+      if (newPannesCount > 0 || redDocsCount > 0) {
+        playAlertSound();
+      }
+
       setStats({
         missions: missionsRes.count || 0,
-        pannes: pannesRes.count || 0,
+        pannes: newPannesCount,
         camions: camionsRes.data?.length || 0,
         docs: redDocsCount 
       });
@@ -120,7 +150,7 @@ export default function SuperviseurDashboardGTS() {
     } catch (err) {
       console.error("Erreur stats:", err.message);
     }
-  }, []);
+  }, [playAlertSound]);
 
   // --- REALTIME ---
   useEffect(() => {
@@ -133,7 +163,7 @@ export default function SuperviseurDashboardGTS() {
         (payload) => {
           fetchStats();
           if (payload.eventType === "INSERT" && payload.new.statut === "en_cours") {
-            audioRef.current.play().catch(() => {});
+            playAlertSound(); // Jouer le son sur insert temps réel
             toast.error("🚨 NOUVELLE PANNE SIGNALÉE !");
           }
         }
@@ -141,7 +171,9 @@ export default function SuperviseurDashboardGTS() {
       .subscribe();
 
     return () => supabase.removeChannel(channel);
-  }, [fetchStats]);
+  }, [fetchStats, playAlertSound]);
+
+  // ... (Reste du code identique : checkAccess, UI structure, NavItem, etc.)
 
   const checkAccess = useCallback(async () => {
     try {
@@ -184,7 +216,6 @@ export default function SuperviseurDashboardGTS() {
       {/* SIDEBAR */}
       <aside className={`fixed inset-y-0 left-0 z-50 w-72 bg-slate-900 text-white shadow-2xl transform transition-transform duration-300 md:translate-x-0 md:relative md:flex md:flex-col ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"}`}>
         <div className="flex flex-col h-full">
-          {/* Bouton fermeture mobile */}
           <div className="md:hidden absolute top-4 right-4">
             <button onClick={() => setIsMobileMenuOpen(false)} className="p-2 text-white/50 hover:text-white">
               <X size={24} />

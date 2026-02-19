@@ -54,7 +54,29 @@ export default function SuperviseurDashboardBaticom() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
   
+  // --- AUDIO LOGIC ---
   const audioRef = useRef(new Audio("https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3"));
+
+  // Fonction pour jouer le son en toute sécurité (avec reset du curseur)
+  const playAlertSound = useCallback(() => {
+    if (audioRef.current) {
+      audioRef.current.currentTime = 0;
+      audioRef.current.play().catch(err => console.warn("Audio bloqué par le navigateur"));
+    }
+  }, []);
+
+  // Déblocage de l'audio au premier clic sur la page
+  useEffect(() => {
+    const unlockAudio = () => {
+      audioRef.current.play().then(() => {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+      }).catch(() => {});
+      window.removeEventListener('click', unlockAudio);
+    };
+    window.addEventListener('click', unlockAudio);
+    return () => window.removeEventListener('click', unlockAudio);
+  }, []);
 
   // --- DARK MODE LOGIC ---
   useEffect(() => {
@@ -74,7 +96,7 @@ export default function SuperviseurDashboardBaticom() {
   // --- NAVIGATION ET FERMETURE DU MENU ---
   const handleSectionChange = (id) => {
     setSection(id);
-    setIsMobileMenuOpen(false); // Ferme le sidebar sur mobile après le clic
+    setIsMobileMenuOpen(false);
   };
 
   // --- FETCH STATS ---
@@ -112,9 +134,14 @@ export default function SuperviseurDashboardBaticom() {
         if (checkRed(c.visitetechniqueexpiry)) redCount++;
       });
 
+      const currentPannes = pannesRes.count || 0;
+      if (currentPannes > 0 || redCount > 0) {
+        playAlertSound();
+      }
+
       setStats({
         missions: missionsRes.count || 0,
-        pannes: pannesRes.count || 0,
+        pannes: currentPannes,
         camions: camionsRes.data?.length || 0,
         docs: redCount 
       });
@@ -122,7 +149,7 @@ export default function SuperviseurDashboardBaticom() {
     } catch (err) {
       console.error("Erreur stats:", err.message);
     }
-  }, []);
+  }, [playAlertSound]);
 
   // --- REALTIME : Surveillance des pannes ---
   useEffect(() => {
@@ -136,14 +163,14 @@ export default function SuperviseurDashboardBaticom() {
         (payload) => {
           fetchStats(userProfile);
           if (payload.eventType === "INSERT" && payload.new.statut === "en_cours") {
-            audioRef.current.play().catch(() => {});
+            playAlertSound();
             toast.error(`NOUVELLE PANNE : ${payload.new.typepanne}`, { icon: '🚨', duration: 4000 });
           }
         }
       )
       .subscribe();
     return () => supabase.removeChannel(channel);
-  }, [userProfile, fetchStats]);
+  }, [userProfile, fetchStats, playAlertSound]);
 
   const checkAccess = useCallback(async () => {
     try {
@@ -195,7 +222,6 @@ export default function SuperviseurDashboardBaticom() {
       {/* SIDEBAR */}
       <aside className={`fixed inset-y-0 left-0 z-50 w-72 bg-slate-900 text-white shadow-2xl transform transition-transform duration-300 md:translate-x-0 md:relative md:flex md:flex-col ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"}`}>
         <div className="flex flex-col h-full">
-          {/* Bouton fermeture mobile */}
           <div className="md:hidden absolute top-4 right-4">
             <button onClick={() => setIsMobileMenuOpen(false)} className="p-2 text-white/50 hover:text-white">
               <X size={24} />
@@ -298,7 +324,6 @@ export default function SuperviseurDashboardBaticom() {
   );
 }
 
-// NavItem composant interne
 const NavItem = ({ id, icon: Icon, label, active, onClick, color }) => (
   <li 
     onClick={onClick}
