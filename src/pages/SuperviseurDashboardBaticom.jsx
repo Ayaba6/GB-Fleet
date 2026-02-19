@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../config/supabaseClient.js";
 import { 
@@ -12,18 +12,18 @@ import { Toaster, toast } from "react-hot-toast";
 import MissionsSectionAdmin from "../components/MissionsSectionAdmin.jsx";
 import PannesSection from "../components/PannesSectionAdmin.jsx";
 import MaintenanceSection from "../components/MaintenanceSection.jsx";
-import AlertesExpiration from "../components/AlertesExpiration.jsx";
+import AlertesDocuments from "../components/AlertesExpiration.jsx"; 
 import BillingExpenses from "../components/BillingExpenses.jsx";
 import CarteFlotte from "../components/CarteFlotte.jsx";
 
-// --- UI COMPONENTS (Harmonisation Admin) ---
+// --- UI COMPONENTS ---
 const Card = ({ className = "", children }) => <div className={`rounded-xl ${className}`}>{children}</div>;
 const CardHeader = ({ className = "", children }) => <div className={`p-4 ${className}`}>{children}</div>;
 const CardContent = ({ className = "", children }) => <div className={`p-4 ${className}`}>{children}</div>;
 
 const COLOR_SCHEMES = {
-  emerald: { text: "text-emerald-700 dark:text-emerald-300" },
   blue: { text: "text-blue-700 dark:text-blue-300" },
+  emerald: { text: "text-emerald-700 dark:text-emerald-300" },
   orange: { text: "text-orange-700 dark:text-orange-300" },
   red: { text: "text-red-700 dark:text-red-400" },
   purple: { text: "text-purple-700 dark:text-purple-300" },
@@ -44,26 +44,18 @@ const StatCard = ({ title, value, icon: Icon, color, onClick, blink = false }) =
   );
 };
 
-const SECTION_TITLES = {
-  dashboard: "Tableau de Bord Baticom",
-  missions: "Suivi des Missions",
-  pannes: "Pannes & Réparations",
-  maintenance: "Entretien Véhicules",
-  documents: "Validité Documents",
-  billing: "Frais & Facturation",
-};
-
 export default function SuperviseurDashboardBaticom() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [userProfile, setUserProfile] = useState(null); 
   const [section, setSection] = useState("dashboard");
-  const [stats, setStats] = useState({ missions: 0, pannes: 0, camions: 0 });
+  const [stats, setStats] = useState({ missions: 0, pannes: 0, docs: 0, camions: 0 });
   const [camions, setCamions] = useState([]); 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
+  
+  const audioRef = useRef(new Audio("https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3"));
 
-  // Initialisation Dark Mode
   useEffect(() => {
     const stored = localStorage.getItem("darkMode");
     const initial = stored ? stored === "true" : window.matchMedia("(prefers-color-scheme: dark)").matches;
@@ -71,137 +63,170 @@ export default function SuperviseurDashboardBaticom() {
     document.documentElement.classList.toggle("dark", initial);
   }, []);
 
+  const toggleDarkMode = () => {
+    const mode = !darkMode;
+    setDarkMode(mode);
+    document.documentElement.classList.toggle("dark", mode);
+    localStorage.setItem("darkMode", mode);
+  };
+
+  const fetchStats = useCallback(async (profile) => {
+    const maStructure = "BATICOM"; 
+    const tableMissions = "journee_baticom";
+    const activeStatus = ["En cours", "En chargement", "En dechargement"];
+    
+    try {
+      const [missionsRes, pannesRes, camionsRes, profilesDocs, camionsDocs] = await Promise.all([
+        supabase.from(tableMissions).select("id", { count: 'exact' }).in("statut", activeStatus),
+        supabase.from("alertespannes").select("id", { count: 'exact' }).eq("statut", "en_cours").eq("structure", maStructure),
+        supabase.from("camions").select("*").eq("structure", maStructure),
+        supabase.from("profiles").select("cnib_expiration, permis_expiration, carte_expiration").eq("structure", maStructure),
+        supabase.from("camions").select("cartegriseexpiry, assuranceexpiry, visitetechniqueexpiry").eq("structure", maStructure)
+      ]);
+
+      const today = new Date();
+      let redCount = 0;
+      const checkRed = (dateStr) => {
+        if (!dateStr) return false;
+        const diff = Math.ceil((new Date(dateStr) - today) / (1000 * 60 * 60 * 24));
+        return diff <= 7;
+      };
+
+      profilesDocs.data?.forEach(p => {
+        if (checkRed(p.cnib_expiration)) redCount++;
+        if (checkRed(p.permis_expiration)) redCount++;
+        if (checkRed(p.carte_expiration)) redCount++;
+      });
+
+      camionsDocs.data?.forEach(c => {
+        if (checkRed(c.cartegriseexpiry)) redCount++;
+        if (checkRed(c.assuranceexpiry)) redCount++;
+        if (checkRed(c.visitetechniqueexpiry)) redCount++;
+      });
+
+      const pannesCount = pannesRes.count || 0;
+
+      // Alerte sonore initiale si alertes critiques
+      if (redCount > 0 || pannesCount > 0) {
+        audioRef.current.play().catch(() => {});
+      }
+
+      setStats({
+        missions: missionsRes.count || 0,
+        pannes: pannesCount,
+        camions: camionsRes.data?.length || 0,
+        docs: redCount 
+      });
+      setCamions(camionsRes.data || []);
+    } catch (err) {
+      console.error("Erreur stats:", err.message);
+    }
+  }, []);
+
+  // --- REALTIME : Surveillance des pannes BATICOM ---
+  useEffect(() => {
+    if (!userProfile) return;
+    
+    const maStructure = "BATICOM";
+    const channel = supabase
+      .channel("realtime-baticom-dashboard")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "alertespannes", filter: `structure=eq.${maStructure}` },
+        (payload) => {
+          // Rafraîchir les stats sur tout changement
+          fetchStats(userProfile);
+
+          // Si c'est une nouvelle panne
+          if (payload.eventType === "INSERT" && payload.new.statut === "en_cours") {
+            audioRef.current.play().catch(() => {});
+            toast.error(`NOUVELLE PANNE SIGNALÉE : ${payload.new.typepanne}`, {
+              icon: '🚨',
+              duration: 5000,
+              style: { border: '2px solid #ef4444', fontWeight: 'bold' }
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => supabase.removeChannel(channel);
+  }, [userProfile, fetchStats]);
+
   const checkAccess = useCallback(async () => {
     try {
       const { data: { user: authUser } } = await supabase.auth.getUser();
       if (!authUser) { navigate("/login"); return null; }
-
-      const { data: profile, error } = await supabase
-        .from("profiles")
-        .select("role, structure") 
-        .eq("id", authUser.id)
-        .single();
-
-      if (error || !profile || (profile.role !== "superviseur" && profile.role !== "admin")) {
+      const { data: profile } = await supabase.from("profiles").select("*").eq("id", authUser.id).single();
+      
+      if (profile?.role !== "superviseur" && profile?.role !== "admin") {
         await supabase.auth.signOut();
         navigate("/login");
         return null;
       }
 
-      const userData = { ...profile, display_name: authUser.email };
+      const userData = { ...profile, display_name: profile.name || profile.full_name || "Baticom User" };
       setUserProfile(userData);
       setLoading(false);
       return userData;
     } catch (err) {
-      console.error("Erreur système:", err);
+      setLoading(false);
       return null;
     }
   }, [navigate]);
-
-  const fetchStats = useCallback(async (profile) => {
-    if (!profile?.structure) return;
-    const maStructure = profile.structure; 
-    const activeStatus = ["En cours", "En chargement", "En dechargement"];
-    const tableMissions = maStructure.toLowerCase() === "baticom" ? "journee_baticom" : "missions_gts";
-
-    try {
-      const [missionsRes, pannesRes, camionsRes] = await Promise.all([
-        supabase.from(tableMissions).select("id", { count: 'exact' }).in("statut", activeStatus),
-        supabase.from("alertespannes").select("id", { count: 'exact' }).eq("statut", "en_cours").eq("structure", maStructure),
-        supabase.from("camions").select("*").eq("structure", maStructure)
-      ]);
-
-      setStats({
-        missions: missionsRes.count || 0,
-        pannes: pannesRes.count || 0,
-        camions: camionsRes.data?.length || 0
-      });
-      setCamions(camionsRes.data || []);
-    } catch (err) {
-      console.error("Erreur stats:", err);
-    }
-  }, []);
 
   useEffect(() => {
     checkAccess().then(profile => { if (profile) fetchStats(profile); });
   }, [checkAccess, fetchStats]);
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    navigate("/login");
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-950">
-        <Loader2 className="h-10 w-10 animate-spin text-emerald-600" />
-      </div>
-    );
-  }
-
-  const NavItem = ({ id, icon: Icon, label }) => (
-    <li 
-      onClick={() => { setSection(id); setIsMobileMenuOpen(false); }}
-      className={`px-6 py-4 flex items-center gap-3 cursor-pointer transition-all ${
-        section === id 
-        ? "bg-emerald-600/20 border-l-4 border-emerald-500 text-emerald-400" 
-        : "text-slate-400 hover:bg-white/5 hover:text-white"
-      }`}
-    >
-      <Icon size={20} />
-      <span className="font-bold text-[10px] uppercase tracking-[0.15em]">{label}</span>
-    </li>
+  if (loading) return (
+    <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-950">
+      <Loader2 className="h-10 w-10 animate-spin text-emerald-600" />
+    </div>
   );
 
+  const isBaticomUI = userProfile?.structure?.toLowerCase() === "baticom";
+  const mainColor = isBaticomUI ? "emerald" : "blue";
+
   return (
-    <div className={`flex min-h-screen ${darkMode ? 'dark' : ''} bg-gray-50 dark:bg-gray-950 font-sans`}>
+    <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-950 font-sans">
       <Toaster position="top-right" />
 
-      {/* Sidebar Baticom Style */}
-      <aside className={`
-        fixed inset-y-0 left-0 z-40 w-72 bg-emerald-950 text-white shadow-2xl transform transition-transform duration-300
-        ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"}
-        md:translate-x-0 md:static
-      `}>
+      <aside className={`fixed inset-y-0 left-0 z-50 w-72 bg-slate-900 text-white shadow-2xl transform transition-transform duration-300 md:translate-x-0 md:relative md:flex md:flex-col ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"}`}>
         <div className="flex flex-col h-full">
-          <div className="p-8 text-center bg-black/20 border-b border-white/5">
-            <h1 className="text-3xl font-black tracking-tighter text-emerald-400 italic">BATICOM</h1>
-            <p className="text-[9px] text-emerald-300/40 mt-1 uppercase tracking-[0.3em] font-bold">Construction & Transport</p>
+          <div className="p-8 text-center bg-slate-950/40 relative">
+            <h1 className={`text-3xl font-black tracking-tighter italic ${isBaticomUI ? "text-emerald-500" : "text-blue-500"}`}>
+              {userProfile?.structure?.toUpperCase() || "SYSTEM"}
+            </h1>
+            <p className="text-[9px] opacity-40 mt-1 uppercase tracking-[0.3em] font-bold">Superviseur Dashboard</p>
           </div>
           
-          <nav className="mt-6 flex-1">
+          <nav className="mt-6 flex-1 overflow-y-auto no-scrollbar">
             <ul>
-              <NavItem id="dashboard" icon={LayoutDashboard} label="Dashboard" />
-              <NavItem id="missions" icon={Truck} label="Missions" />
-              <NavItem id="pannes" icon={AlertTriangle} label="Pannes" />
-              <NavItem id="maintenance" icon={Wrench} label="Maintenance" />
-              <NavItem id="documents" icon={FileWarning} label="Documents" />
-              <NavItem id="billing" icon={Receipt} label="Facturation" />
+              <NavItem id="dashboard" icon={LayoutDashboard} label="Dashboard" active={section === "dashboard"} onClick={() => setSection("dashboard")} color={mainColor} />
+              <NavItem id="missions" icon={Truck} label="Missions" active={section === "missions"} onClick={() => setSection("missions")} color={mainColor} />
+              <NavItem id="pannes" icon={AlertTriangle} label="Pannes" active={section === "pannes"} onClick={() => setSection("pannes")} color={mainColor} />
+              <NavItem id="maintenance" icon={Wrench} label="Maintenance" active={section === "maintenance"} onClick={() => setSection("maintenance")} color={mainColor} />
+              <NavItem id="documents" icon={FileWarning} label="Documents" active={section === "documents"} onClick={() => setSection("documents")} color={mainColor} />
+              <NavItem id="billing" icon={Receipt} label="Dépenses" active={section === "billing"} onClick={() => setSection("billing")} color={mainColor} />
             </ul>
           </nav>
           
-          {/* Profil Emplacement Admin-Style */}
-          <div className="p-6 space-y-4 bg-black/30 border-t border-white/5">
-            <div className="flex items-center gap-3 p-3 bg-white/5 rounded-2xl border border-white/5">
-                <div className="h-10 w-10 rounded-full bg-emerald-600 flex items-center justify-center font-black text-white shadow-lg">
-                    {userProfile?.structure?.charAt(0)}
+          <div className="p-6 space-y-4 bg-slate-950/50 border-t border-white/5">
+            <div className="flex items-center gap-3 p-3 bg-white/5 rounded-2xl">
+                <div className={`h-10 w-10 rounded-full flex items-center justify-center font-black text-white shadow-lg ${isBaticomUI ? "bg-emerald-600" : "bg-blue-600"}`}>
+                    {userProfile?.display_name?.charAt(0)}
                 </div>
                 <div className="min-w-0 flex-1">
-                    <p className="text-[10px] text-emerald-400 font-black uppercase">Superviseur</p>
+                    <p className={`text-[10px] font-black uppercase ${isBaticomUI ? "text-emerald-400" : "text-blue-400"}`}>Superviseur</p>
                     <p className="text-xs truncate font-bold text-white/90">{userProfile?.display_name}</p>
                 </div>
             </div>
-            
             <div className="grid grid-cols-2 gap-2">
-                <button onClick={() => {
-                    const mode = !darkMode;
-                    setDarkMode(mode);
-                    document.documentElement.classList.toggle("dark", mode);
-                    localStorage.setItem("darkMode", mode);
-                }} className="flex items-center justify-center p-3 bg-white/5 rounded-xl hover:bg-white/10 transition-all border border-white/5">
-                  {darkMode ? <Sun size={16} className="text-yellow-400" /> : <Moon size={16} className="text-emerald-400" />}
+                <button onClick={toggleDarkMode} className="p-3 bg-white/5 rounded-xl hover:bg-white/10 transition-all flex justify-center">
+                  {darkMode ? <Sun size={16} className="text-yellow-400" /> : <Moon size={16} className={isBaticomUI ? "text-emerald-400" : "text-blue-400"} />}
                 </button>
-                <button onClick={handleLogout} className="flex items-center justify-center p-3 bg-red-500/10 rounded-xl hover:bg-red-500 transition-all border border-red-500/20 text-red-500 hover:text-white">
+                <button onClick={() => supabase.auth.signOut().then(() => navigate("/login"))} className="p-3 bg-red-500/10 rounded-xl hover:bg-red-500 text-red-500 hover:text-white transition-all flex justify-center">
                   <LogOut size={16} />
                 </button>
             </div>
@@ -209,64 +234,53 @@ export default function SuperviseurDashboardBaticom() {
         </div>
       </aside>
 
-      {/* Main Content Harmonisé Admin */}
-      <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <header className="h-16 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800 flex items-center justify-between px-8 sticky top-0 z-30">
+      <main className="flex-1 flex flex-col min-w-0">
+        <header className="h-16 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between px-8 shrink-0 z-30">
           <div className="flex items-center gap-4">
-            <button className="md:hidden p-2 text-gray-600" onClick={() => setIsMobileMenuOpen(true)}>
-              <Menu size={24} />
-            </button>
-            <h2 className="text-lg font-bold text-slate-800 dark:text-white tracking-tight italic">
-               {SECTION_TITLES[section]}
+            <button className="md:hidden p-2" onClick={() => setIsMobileMenuOpen(true)}><Menu size={24} /></button>
+            <h2 className="text-lg font-bold text-slate-800 dark:text-white italic">
+               {section === "dashboard" ? `Vue d'ensemble ${userProfile?.structure}` : section.toUpperCase()}
             </h2>
           </div>
-          
+          <div className={`px-4 py-1 rounded-full text-[10px] font-black tracking-widest uppercase ${isBaticomUI ? "bg-emerald-100 text-emerald-600" : "bg-blue-100 text-blue-600"}`}>
+            {userProfile?.structure}
+          </div>
         </header>
 
         <div className="flex-1 overflow-y-auto p-4 md:p-8">
           <div className="max-w-7xl mx-auto">
             {section === "dashboard" ? (
-              <div className="space-y-6 animate-in fade-in duration-500">
-                
-                {/* Header Card Style Admin */}
-                <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm">
-                  <CardHeader>
-                    <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100 flex items-center gap-3">
-                      <GaugeCircle size={24} className="text-emerald-600" /> 
-                      Vue d'ensemble BATICOM
-                    </h2>
-                  </CardHeader>
-                </Card>
-
-                {/* StatCards Harmonisé Admin */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                  <StatCard title="Missions Actives" value={stats.missions} icon={Truck} color="emerald" onClick={() => setSection("missions")} />
+              <div className="space-y-6 animate-fadeIn">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <StatCard title="Missions Actives" value={stats.missions} icon={Truck} color={mainColor} onClick={() => setSection("missions")} />
                   <StatCard title="Flotte Camions" value={stats.camions} icon={ClipboardList} color="blue" onClick={() => setSection("maintenance")} />
+                  
+                  {/* PANNES : BLINK SI > 0 */}
                   <StatCard title="Pannes Alertes" value={stats.pannes} icon={AlertTriangle} color="red" blink={stats.pannes > 0} onClick={() => setSection("pannes")} />
+                  
+                  {/* DOCS : BLINK SI > 0 */}
+                  <StatCard title="Documents Rouges" value={stats.docs} icon={FileWarning} color="purple" blink={stats.docs > 0} onClick={() => setSection("documents")} />
                 </div>
 
-                {/* Carte de Flotte Intégrée */}
                 <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
                   <CardHeader className="border-b border-gray-100 dark:border-gray-700 flex justify-between items-center">
-                    <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 uppercase tracking-tighter italic">Géolocalisation Baticom</h3>
+                    <h3 className="text-lg font-semibold">Localisation Flotte {userProfile?.structure}</h3>
                     <div className="flex items-center gap-2">
-                        <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                        <span className="text-[10px] font-bold text-emerald-500 uppercase">En direct</span>
+                        <span className={`flex h-2 w-2 rounded-full animate-pulse ${isBaticomUI ? "bg-emerald-500" : "bg-blue-500"}`}></span>
+                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">Live Track</span>
                     </div>
                   </CardHeader>
-                  <CardContent className="p-0 sm:p-4">
-                    <div className="h-96 rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-700 shadow-inner">
+                  <CardContent className="p-0 h-[500px]">
                       <CarteFlotte camions={camions} center={[12.37, -1.53]} />
-                    </div>
                   </CardContent>
                 </Card>
               </div>
             ) : (
-              <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
                 {section === "missions" && <MissionsSectionAdmin structure={userProfile?.structure} />}
                 {section === "pannes" && <PannesSection structure={userProfile?.structure} />}
                 {section === "maintenance" && <MaintenanceSection camions={camions} />}
-                {section === "documents" && <AlertesExpiration structure={userProfile?.structure} />}
+                {section === "documents" && <AlertesDocuments role="superviseur" structure={userProfile?.structure} />}
                 {section === "billing" && <BillingExpenses structure={userProfile?.structure} />}
               </div>
             )}
@@ -276,3 +290,17 @@ export default function SuperviseurDashboardBaticom() {
     </div>
   );
 }
+
+const NavItem = ({ id, icon: Icon, label, active, onClick, color }) => (
+  <li 
+    onClick={onClick}
+    className={`px-6 py-4 flex items-center gap-3 cursor-pointer transition-all ${
+      active 
+      ? `bg-${color}-600/10 border-l-4 border-${color}-500 text-${color}-500` 
+      : "text-slate-400 hover:bg-white/5 hover:text-white"
+    }`}
+  >
+    <Icon size={20} />
+    <span className="font-bold text-[10px] uppercase tracking-[0.15em]">{label}</span>
+  </li>
+);

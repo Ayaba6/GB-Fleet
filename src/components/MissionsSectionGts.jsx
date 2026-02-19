@@ -1,9 +1,9 @@
-/* Fichier complet corrigé - MissionsSectionGTS.jsx */
+/* Fichier complet mis à jour - MissionsSectionGTS.jsx */
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "../config/supabaseClient.js";
 import { Button } from "./ui/button.jsx";
-import { Card, CardHeader } from "./ui/card.jsx";
-import { Pencil, Lock, Eye, Loader2, User, Truck, Calendar, Trash2 } from "lucide-react";
+import { Card } from "./ui/card.jsx";
+import { Pencil, Lock, Eye, Loader2, User, Truck, Calendar, Trash2, Search } from "lucide-react";
 import OpenMissionModalGTS from "./modals/OpenMissionModalGTS.jsx";
 import EditMissionModalGTS from "./modals/EditMissionModalGTS.jsx";
 import DetailsMissionModalGTS from "./modals/DetailsMissionModalGTS.jsx";
@@ -14,92 +14,84 @@ const STRUCTURE = "GTS";
 const STATUS_CLOSED = "Clôturée";
 
 /* ---------------------------
-    CARD MISSION — HARMONISÉE
+    CARD MISSION — HARMONISÉE & RESPONSIVE
 --------------------------- */
 const CardMissionGTS = ({ mission, chauffeur, camion, onEdit, onClose, onView, onDelete }) => {
   const isClosed = mission.statut === STATUS_CLOSED;
 
-  let statutBg, statutText;
-  switch (mission.statut) {
-    case "Affectée": statutBg = "bg-yellow-600"; statutText = "text-white"; break;
-    case "En Cours": statutBg = "bg-green-600"; statutText = "text-white"; break;
-    case "En Chargement": statutBg = "bg-orange-600"; statutText = "text-white"; break;
-    case "En Déchargement": statutBg = "bg-indigo-600"; statutText = "text-white"; break;
-    case STATUS_CLOSED: statutBg = "bg-gray-600"; statutText = "text-white"; break;
-    default: statutBg = "bg-blue-600"; statutText = "text-white"; break;
-  }
+  const getStatutStyles = (statut) => {
+    switch (statut) {
+      case "Affectée": return "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400";
+      case "En Cours": return "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400";
+      case "En Chargement": return "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400";
+      case "En Déchargement": return "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400";
+      case STATUS_CLOSED: return "bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300";
+      default: return "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400";
+    }
+  };
 
   return (
-    <Card className={`shadow-lg p-4 bg-white/70 dark:bg-gray-800/70 border backdrop-blur-sm transition-all ${
+    <Card className={`relative overflow-hidden shadow-md p-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 transition-all hover:shadow-lg ${
       ["En Cours", "En Chargement", "En Déchargement"].includes(mission.statut)
-        ? "border-green-500 border-l-4 shadow-green-100/50 dark:shadow-none" 
-        : "border-gray-200 dark:border-gray-700"
+        ? "border-l-4 border-green-500 shadow-green-500/10" 
+        : "border-l-4 border-gray-300 dark:border-gray-600"
     }`}>
-      <div className="flex justify-between items-start">
-        <div className="flex-1">
-          <h3 className="font-bold text-lg text-gray-800 dark:text-white flex items-center gap-1">
-            <User size={18} className="text-indigo-600" /> {chauffeur?.name || "N/A"}
+      <div className="flex justify-between items-start gap-2">
+        <div className="flex-1 min-w-0">
+          <h3 className="font-bold text-base text-gray-900 dark:text-white flex items-center gap-2 truncate">
+            <User size={16} className="text-indigo-500 flex-shrink-0" /> 
+            <span className="truncate">{chauffeur?.name || "N/A"}</span>
           </h3>
-          <p className="text-sm text-gray-600 dark:text-gray-300 flex items-center gap-1 mt-1">
-            <Truck size={14} className="text-blue-600" /> Camion: <b>{camion?.immatriculation || "N/A"}</b>
-          </p>
-          <p className="text-sm text-gray-600 dark:text-gray-300 flex items-center gap-1">
-            <Calendar size={14} className="text-green-600" /> Date: <b>{mission.date ? new Date(mission.date).toLocaleDateString() : "N/A"}</b>
-          </p>
-
-          <div className="flex flex-wrap gap-2 mt-2">
-            <span className="text-xs bg-gray-200 dark:bg-gray-700 px-2 py-1 rounded-md text-gray-800 dark:text-gray-200">
-              Fuel: {(mission.frais_fuel || 0).toLocaleString("fr-FR")} FCFA
-            </span>
-            <span className="text-xs bg-gray-200 dark:bg-gray-700 px-2 py-1 rounded-md text-gray-800 dark:text-gray-200">
-              Mission: {(mission.frais_mission || 0).toLocaleString("fr-FR")} FCFA
-            </span>
+          
+          <div className="mt-2 space-y-1">
+            <p className="text-xs md:text-sm text-gray-600 dark:text-gray-400 flex items-center gap-2 truncate">
+              <Truck size={14} className="text-blue-500 flex-shrink-0" />
+              <span className="truncate font-semibold">{camion?.immatriculation || "N/A"}</span>
+            </p>
+            <p className="text-xs md:text-sm text-gray-600 dark:text-gray-400 flex items-center gap-2">
+              <Calendar size={14} className="text-green-500 flex-shrink-0" />
+              <span>{mission.date ? new Date(mission.date).toLocaleDateString() : "N/A"}</span>
+            </p>
           </div>
         </div>
 
-        <div className="flex flex-col gap-2 mt-1">
-          <span className={`text-[10px] font-bold uppercase rounded-full px-2 py-1 text-center whitespace-nowrap shadow-sm ${statutBg} ${statutText}`}>
-            {mission.statut}
-          </span>
+        <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md whitespace-nowrap shadow-sm ${getStatutStyles(mission.statut)}`}>
+          {mission.statut}
+        </span>
+      </div>
+
+      {/* Détails Frais - Grille */}
+      <div className="mt-4 grid grid-cols-2 gap-2">
+        <div className="bg-gray-50 dark:bg-gray-900/50 p-2 rounded-lg text-center border border-gray-100 dark:border-gray-700">
+          <p className="text-[9px] uppercase font-bold text-gray-400">Frais Fuel</p>
+          <p className="text-xs font-black text-gray-700 dark:text-gray-200">{(mission.frais_fuel || 0).toLocaleString()} <span className="text-[8px]">F</span></p>
+        </div>
+        <div className="bg-gray-50 dark:bg-gray-900/50 p-2 rounded-lg text-center border border-gray-100 dark:border-gray-700">
+          <p className="text-[9px] uppercase font-bold text-gray-400">Mission</p>
+          <p className="text-xs font-black text-gray-700 dark:text-gray-200">{(mission.frais_mission || 0).toLocaleString()} <span className="text-[8px]">F</span></p>
         </div>
       </div>
 
-      <div className="flex justify-end gap-2 mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
+      {/* Actions */}
+      <div className="flex flex-wrap justify-end gap-2 mt-4 pt-3 border-t border-gray-100 dark:border-gray-700">
         {!isClosed ? (
-          <>
-            <Button
-              size="sm"
-              className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-1"
-              onClick={() => onEdit(mission)}
-            >
-              <Pencil size={14} /> Modif.
+          <div className="flex w-full sm:w-auto gap-2">
+            <Button size="sm" className="flex-1 sm:flex-none h-9 bg-blue-600 hover:bg-blue-700 text-white" onClick={() => onEdit(mission)}>
+              <Pencil size={14} className="mr-1.5" /> Modifier
             </Button>
-            <Button
-              size="sm"
-              className="bg-red-600 hover:bg-red-700 text-white flex items-center gap-1"
-              onClick={() => onClose(mission.id)}
-            >
-              <Lock size={14} /> Clôturer
+            <Button size="sm" className="flex-1 sm:flex-none h-9 bg-red-600 hover:bg-red-700 text-white" onClick={() => onClose(mission.id)}>
+              <Lock size={14} className="mr-1.5" /> Clôturer
             </Button>
-          </>
+          </div>
         ) : (
-          <>
-            <Button
-              size="sm"
-              className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-1"
-              onClick={() => onView(mission)}
-            >
-              <Eye size={14} /> Détails
+          <div className="flex w-full sm:w-auto gap-2">
+            <Button size="sm" className="flex-1 sm:flex-none h-9 bg-blue-600 hover:bg-blue-700 text-white" onClick={() => onView(mission)}>
+              <Eye size={14} className="mr-1.5" /> Détails
             </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              className="border-red-200 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
-              onClick={() => onDelete(mission.id)}
-            >
+            <Button size="sm" variant="outline" className="h-9 border-red-200 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20" onClick={() => onDelete(mission.id)}>
               <Trash2 size={14} />
             </Button>
-          </>
+          </div>
         )}
       </div>
     </Card>
@@ -123,41 +115,35 @@ export default function MissionsSectionGTS() {
   const [selectedMissionId, setSelectedMissionId] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const fetchChauffeurs = useCallback(async () => {
-    const { data } = await supabase.from("profiles").select("id, name").eq("role", "chauffeur").eq("structure", STRUCTURE);
-    setChauffeurs(data || []);
-  }, []);
-
-  const fetchCamions = useCallback(async () => {
-    const { data } = await supabase.from("camions").select("id, immatriculation").eq("structure", STRUCTURE);
-    setCamions(data || []);
-  }, []);
-
-  const fetchMissions = useCallback(async () => {
+  const fetchData = useCallback(async () => {
     setIsLoading(true);
-    const { data } = await supabase.from("missions_gts").select("*").eq("structure", STRUCTURE).order("date", { ascending: false });
-    setMissions(data || []);
-    setIsLoading(false);
+    try {
+      const [p, c, m] = await Promise.all([
+        supabase.from("profiles").select("id, name").eq("role", "chauffeur").eq("structure", STRUCTURE),
+        supabase.from("camions").select("id, immatriculation").eq("structure", STRUCTURE),
+        supabase.from("missions_gts").select("*").eq("structure", STRUCTURE).order("date", { ascending: false })
+      ]);
+      setChauffeurs(p.data || []);
+      setCamions(c.data || []);
+      setMissions(m.data || []);
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
 
-  useEffect(() => {
-    fetchChauffeurs();
-    fetchCamions();
-    fetchMissions();
-  }, [fetchChauffeurs, fetchCamions, fetchMissions]);
+  useEffect(() => { fetchData(); }, [fetchData]);
 
   const handleCloseMission = async (id) => {
     const today = new Date().toISOString().split("T")[0];
     await supabase.from("missions_gts").update({ statut: STATUS_CLOSED, date_cloture: today }).eq("id", id);
-    fetchMissions();
+    fetchData();
   };
 
   const handleDeleteMission = async (id) => {
     await supabase.from("missions_gts").delete().eq("id", id);
-    fetchMissions();
+    fetchData();
   };
 
-  // --- LOGIQUE DE TRI ET FILTRAGE CORRIGÉE ---
   const { paginatedMissions, totalPages } = useMemo(() => {
     const filtered = missions.filter((m) => {
       const chauffeur = chauffeurs.find((c) => c.id === m.chauffeur_id);
@@ -170,78 +156,88 @@ export default function MissionsSectionGTS() {
       );
     });
 
-    // PRIORITÉ : 1 pour les missions actives sur la route, 2 pour les affectées, 3 pour les clôturées
-    const statusPriority = { 
-        "En Cours": 1, 
-        "En Chargement": 1, 
-        "En Déchargement": 1, 
-        "Affectée": 2, 
-        "Clôturée": 3 
-    };
-
+    const statusPriority = { "En Cours": 1, "En Chargement": 1, "En Déchargement": 1, "Affectée": 2, "Clôturée": 3 };
     const sorted = [...filtered].sort((a, b) => {
       const pA = statusPriority[a.statut] || 99;
       const pB = statusPriority[b.statut] || 99;
-      
-      // Si la priorité de statut est différente, on trie par statut
-      if (pA !== pB) return pA - pB;
-      
-      // Si même statut, on trie par date la plus récente en haut
-      return new Date(b.date) - new Date(a.date);
+      return pA !== pB ? pA - pB : new Date(b.date) - new Date(a.date);
     });
 
-    const totalPagesCount = Math.ceil(sorted.length / ITEMS_PER_PAGE);
-    const paginated = sorted.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
-    return { paginatedMissions: paginated, totalPages: totalPagesCount };
+    return {
+      paginatedMissions: sorted.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE),
+      totalPages: Math.ceil(sorted.length / ITEMS_PER_PAGE)
+    };
   }, [missions, chauffeurs, camions, searchTerm, currentPage]);
 
   return (
-    <div className="flex-1 flex flex-col space-y-6 py-6">
-      <Card className="shadow-lg bg-white/80 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 backdrop-blur-sm">
-        <CardHeader className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-          <h2 className="text-xl sm:text-2xl font-bold text-gray-800 dark:text-gray-100 flex items-center gap-3">
-            <Calendar size={24} className="text-blue-600" /> Gestion des Missions {STRUCTURE}
+    <div className="p-3 md:p-6 space-y-4 animate-fadeIn">
+      
+      {/* HEADER */}
+      <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 md:p-6 shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h2 className="text-xl md:text-2xl font-black text-gray-900 dark:text-white flex items-center gap-3">
+            <Calendar className="text-blue-600 w-6 h-6 md:w-8 md:h-8" />
+            Missions GTS
           </h2>
-          <Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => setShowModal(true)}>
-            + Ouvrir une Mission
-          </Button>
-        </CardHeader>
-      </Card>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Suivi logistique et financier</p>
+        </div>
+        <Button
+          onClick={() => setShowModal(true)}
+          className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold h-11 px-6 rounded-xl shadow-lg shadow-blue-500/20"
+        >
+          + Ouvrir une Mission
+        </Button>
+      </div>
 
-      <div className="flex gap-3 items-center bg-white/80 dark:bg-gray-800/80 p-4 rounded-xl shadow border border-gray-100 dark:border-gray-700">
+      {/* RECHERCHE */}
+      <div className="flex items-center bg-white dark:bg-gray-800 px-4 py-2 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 focus-within:ring-2 focus-within:ring-blue-500/20 transition-all">
+        <Search size={18} className="text-gray-400 mr-3 flex-shrink-0" />
         <input
           type="text"
-          placeholder="🔍 Rechercher chauffeur, camion ou date..."
+          placeholder="Rechercher chauffeur, camion..."
           value={searchTerm}
-          onChange={(e) => {setSearchTerm(e.target.value); setCurrentPage(1);}}
-          className="flex-1 border border-gray-300 dark:border-gray-600 rounded px-3 py-1 bg-white dark:bg-gray-700 dark:text-gray-200 focus:ring-2 focus:ring-blue-500 outline-none"
+          onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+          className="flex-1 bg-transparent border-none focus:ring-0 text-sm py-2 text-gray-800 dark:text-gray-200 outline-none"
         />
-        {isLoading && <Loader2 className="animate-spin text-blue-500" size={24} />}
+        {isLoading && <Loader2 className="animate-spin text-blue-500 ml-2" size={18} />}
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {paginatedMissions.map((m) => (
-          <CardMissionGTS
-            key={m.id}
-            mission={m}
-            chauffeur={chauffeurs.find((c) => c.id === m.chauffeur_id)}
-            camion={camions.find((c) => c.id === m.camion_id)}
-            onEdit={setEditMission}
-            onView={setDetailsMission}
-            onClose={(id) => { setSelectedMissionId(id); setConfirmOpen(true); }}
-            onDelete={(id) => { setSelectedMissionId(id); setConfirmDeleteOpen(true); }}
-          />
-        ))}
+      {/* GRILLE */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        {isLoading ? (
+          Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="h-52 bg-gray-100 dark:bg-gray-800 animate-pulse rounded-2xl" />
+          ))
+        ) : paginatedMissions.length === 0 ? (
+          <div className="col-span-full text-center py-16 bg-gray-50 dark:bg-gray-800/20 rounded-2xl border-2 border-dashed border-gray-200 dark:border-gray-700">
+            <p className="text-gray-500">Aucune mission GTS trouvée.</p>
+          </div>
+        ) : (
+          paginatedMissions.map((m) => (
+            <CardMissionGTS
+              key={m.id}
+              mission={m}
+              chauffeur={chauffeurs.find((c) => c.id === m.chauffeur_id)}
+              camion={camions.find((c) => c.id === m.camion_id)}
+              onEdit={setEditMission}
+              onView={setDetailsMission}
+              onClose={(id) => { setSelectedMissionId(id); setConfirmOpen(true); }}
+              onDelete={(id) => { setSelectedMissionId(id); setConfirmDeleteOpen(true); }}
+            />
+          ))
+        )}
       </div>
 
+      {/* PAGINATION */}
       {totalPages > 1 && (
-        <div className="flex justify-center gap-2 mt-4">
+        <div className="flex justify-center flex-wrap gap-2 pt-6">
           {Array.from({ length: totalPages }, (_, i) => (
             <Button
               key={i}
-              variant={i + 1 === currentPage ? "default" : "outline"}
+              size="sm"
+              variant={currentPage === i + 1 ? "default" : "outline"}
               onClick={() => setCurrentPage(i + 1)}
-              className={i + 1 === currentPage ? "bg-blue-600 text-white" : ""}
+              className={`min-w-[40px] rounded-lg ${currentPage === i + 1 ? "bg-blue-600" : "bg-white dark:bg-gray-800"}`}
             >
               {i + 1}
             </Button>
@@ -249,15 +245,16 @@ export default function MissionsSectionGTS() {
         </div>
       )}
 
-      {showModal && <OpenMissionModalGTS setShowModal={setShowModal} fetchMissions={fetchMissions} chauffeurs={chauffeurs} camions={camions} />}
-      {editMission && <EditMissionModalGTS editingMission={editMission} setShowModal={setEditMission} fetchMissions={fetchMissions} />}
+      {/* MODALS */}
+      {showModal && <OpenMissionModalGTS setShowModal={setShowModal} fetchMissions={fetchData} chauffeurs={chauffeurs} camions={camions} />}
+      {editMission && <EditMissionModalGTS editingMission={editMission} setShowModal={setEditMission} fetchMissions={fetchData} />}
       {detailsMission && <DetailsMissionModalGTS mission={detailsMission} setShowModal={setDetailsMission} />}
 
       <ConfirmDialog
         open={confirmOpen}
         onClose={setConfirmOpen}
         title="Clôturer cette mission ?"
-        description="Cette action marquera la mission comme terminée."
+        description="Elle sera archivée et les frais ne pourront plus être modifiés."
         confirmLabel="Clôturer"
         confirmColor="bg-red-600 hover:bg-red-700"
         onConfirm={async () => { await handleCloseMission(selectedMissionId); setConfirmOpen(false); }}
@@ -266,10 +263,10 @@ export default function MissionsSectionGTS() {
       <ConfirmDialog
         open={confirmDeleteOpen}
         onClose={setConfirmDeleteOpen}
-        title="Supprimer définitivement ?"
-        description="Êtes-vous sûr de vouloir supprimer cette mission ? Cette action est irréversible."
+        title="Supprimer la mission ?"
+        description="Cette action supprimera définitivement l'historique de cette mission."
         confirmLabel="Supprimer"
-        confirmColor="bg-black hover:bg-gray-800"
+        confirmColor="bg-black dark:bg-gray-900"
         onConfirm={async () => { await handleDeleteMission(selectedMissionId); setConfirmDeleteOpen(false); }}
       />
     </div>
