@@ -9,7 +9,8 @@ import logo from "../../assets/logo_gts.png";
 
 const parseDecimal = (value) => {
   if (!value) return 0;
-  return Number(String(value).replace(",", "."));
+  const cleanValue = String(value).replace(/\s/g, "").replace(",", ".");
+  return Number(cleanValue) || 0;
 };
 
 function convertNumberToWords(n) {
@@ -56,9 +57,20 @@ function convertNumberToWords(n) {
   return words.trim();
 }
 
-function formatNumberWithSpace(n){
-  if(typeof n!=="number") n = Number(n)||0;
-  return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g," ");
+/**
+ * Formate avec 2 décimales (pour les quantités)
+ */
+function formatQuantity(n) {
+  const val = typeof n !== "number" ? Number(n) || 0 : n;
+  return val.toFixed(2).replace(".", ",").replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+}
+
+/**
+ * Formate sans décimales (pour les montants monétaires)
+ */
+function formatMoney(n) {
+  const val = typeof n !== "number" ? Number(n) || 0 : n;
+  return Math.round(val).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
 }
 
 /* =========================
@@ -139,7 +151,6 @@ export const generateInvoicePDFGTS = (invoiceData) => {
 
   /* ===== TABLEAU ===== */
   if(invoiceData.summaryData?.length){
-    // Modification de l'en-tête ici
     const tableHead = ["N°","Immatriculation","Bon","Date","Quantité (T)","Tarif (33000)","Retenue 5%","Montant net"];
     
     // Totaux
@@ -153,18 +164,18 @@ export const generateInvoicePDFGTS = (invoiceData) => {
       r.immatriculation||"-", 
       r.bonLivraison||"-", 
       r.dateDechargement||"-",
-      r.quantite || "0,00", 
-      formatNumberWithSpace(Number(r.tarif || 0)), // Correction de la parenthèse ici
-      formatNumberWithSpace(Number(r.retenue)||0), 
-      formatNumberWithSpace(Number(r.montantNet)||0)
+      formatQuantity(parseDecimal(r.quantite)), // 2 chiffres après virgule
+      formatMoney(Number(r.tarif || 0)),         // Entier
+      formatMoney(Number(r.retenue)||0),         // Entier
+      formatMoney(Number(r.montantNet)||0)       // Entier
     ]);
 
     tableBody.push([
       { content: "TOTAL MONTANT À PAYER", colSpan: 4, styles: { halign: "center", fontStyle: "bold", fillColor: [240,240,240] } },
-      { content: formatNumberWithSpace(totQ).replace(".", ","), styles: { halign: "right", fontStyle: "bold", fillColor: [240,240,240] } },
-      { content: formatNumberWithSpace(totT), styles: { halign: "right", fontStyle: "bold", fillColor: [240,240,240] } },
-      { content: formatNumberWithSpace(totR), styles: { halign: "right", fontStyle: "bold", fillColor: [240,240,240] } },
-      { content: formatNumberWithSpace(totN), styles: { halign: "right", fontStyle: "bold", fillColor: [240,240,240] } }
+      { content: formatQuantity(totQ), styles: { halign: "right", fontStyle: "bold", fillColor: [240,240,240] } },
+      { content: formatMoney(totT), styles: { halign: "right", fontStyle: "bold", fillColor: [240,240,240] } },
+      { content: formatMoney(totR), styles: { halign: "right", fontStyle: "bold", fillColor: [240,240,240] } },
+      { content: formatMoney(totN), styles: { halign: "right", fontStyle: "bold", fillColor: [240,240,240] } }
     ]);
 
     autoTable(doc,{
@@ -183,7 +194,7 @@ export const generateInvoicePDFGTS = (invoiceData) => {
     y += 6;
     const words = convertNumberToWords(totN);
     doc.setFont("times","bold");
-    doc.text(`${words.charAt(0).toUpperCase()+words.slice(1)} (${formatNumberWithSpace(totN)}) francs CFA.`, 14, y);
+    doc.text(`${words.charAt(0).toUpperCase()+words.slice(1)} (${formatMoney(totN)}) francs CFA.`, 14, y);
 
     y += 30;
     doc.text("Le Directeur Général", 150, y);
