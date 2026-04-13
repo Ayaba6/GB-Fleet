@@ -14,47 +14,60 @@ const parseDecimal = (value) => {
 };
 
 function convertNumberToWords(n) {
-  const units = ["","un","deux","trois","quatre","cinq","six","sept","huit","neuf","dix","onze","douze","treize","quatorze","quinze","seize"];
-  const tens = ["","dix","vingt","trente","quarante","cinquante","soixante","soixante","quatre-vingt","quatre-vingt"];
+  const units = ["", "un", "deux", "trois", "quatre", "cinq", "six", "sept", "huit", "neuf", "dix", "onze", "douze", "treize", "quatorze", "quinze", "seize"];
+  const tens = ["", "dix", "vingt", "trente", "quarante", "cinquante", "soixante", "soixante", "quatre-vingt", "quatre-vingt"];
 
-  function underHundred(num){
-    if(num<17) return units[num];
-    if(num<20) return "dix-"+units[num-10];
-    const ten = Math.floor(num/10);
-    const unit = num%10;
+  function underHundred(num) {
+    if (num < 17) return units[num];
+    if (num < 20) return "dix-" + units[num - 10];
+    const ten = Math.floor(num / 10);
+    const unit = num % 10;
     let word = tens[ten];
-    if(ten===7||ten===9) word+="-"+units[10+unit];
-    else if(unit===1 && ten!==8) word+="-et-un";
-    else if(unit>0) word+="-"+units[unit];
-    if(ten===8 && unit===0) word+="s";
+
+    if (ten === 7 || ten === 9) {
+      if (unit === 1 && ten === 7) return "soixante-et-onze";
+      return word + "-" + underHundred(10 + unit);
+    } else if (unit === 1 && ten !== 8) {
+      word += "-et-un";
+    } else if (unit > 0) {
+      word += "-" + units[unit];
+    }
+    
+    if (ten === 8 && unit === 0) word += "s";
     return word;
   }
 
-  function underThousand(num){
-    let words="";
-    const hundreds = Math.floor(num/100);
+  function underThousand(num) {
+    let words = "";
+    const hundreds = Math.floor(num / 100);
     const remainder = num % 100;
-    if(hundreds>0){
-      words += hundreds===1?"cent":units[hundreds]+" cent";
-      if(remainder===0 && hundreds>1) words+="s";
-      if(remainder>0) words+=" ";
+    if (hundreds > 0) {
+      words += hundreds === 1 ? "cent" : units[hundreds] + " cent";
+      if (remainder === 0 && hundreds > 1) words += "s";
+      if (remainder > 0) words += " ";
     }
-    if(remainder>0) words+=underHundred(remainder);
+    if (remainder > 0) words += underHundred(remainder);
     return words.trim();
   }
 
-  if(n===0) return "zéro";
+  if (n === 0) return "zéro";
   const absN = Math.abs(Math.round(n));
-  let words="";
-  const millions = Math.floor(absN/1_000_000);
-  const thousands = Math.floor((absN%1_000_000)/1_000);
-  const remainder = absN%1000;
+  let finalWords = "";
+  const millions = Math.floor(absN / 1_000_000);
+  const thousands = Math.floor((absN % 1_000_000) / 1_000);
+  const remainder = absN % 1000;
 
-  if(millions>0) words+=convertNumberToWords(millions)+(millions>1?" millions ":" million ");
-  if(thousands>0) words+=(thousands===1?"mille ":convertNumberToWords(thousands)+" mille ");
-  if(remainder>0) words+=underThousand(remainder);
+  if (millions > 0) {
+    finalWords += underThousand(millions) + (millions > 1 ? " millions " : " million ");
+  }
+  if (thousands > 0) {
+    finalWords += (thousands === 1 ? "mille " : underThousand(thousands) + " mille ");
+  }
+  if (remainder > 0) {
+    finalWords += underThousand(remainder);
+  }
 
-  return words.trim();
+  return finalWords.trim();
 }
 
 /**
@@ -87,33 +100,33 @@ export const generateInvoicePDFGTS = (invoiceData) => {
     if (doc.setGState) {
       doc.setGState(new doc.GState({ opacity: 0.1 }));
     }
-    doc.addImage(logo, "PNG", (pageWidth-120)/2, (pageHeight-120)/2, 120, 120);
+    doc.addImage(logo, "PNG", (pageWidth - 120) / 2, (pageHeight - 120) / 2, 120, 120);
     doc.restoreGraphicsState?.();
   }
 
   /* ===== LOGO HAUT ===== */
-  if(logo) doc.addImage(logo,"PNG",14,10,50,20);
+  if (logo) doc.addImage(logo, "PNG", 14, 10, 50, 20);
 
   /* ===== MISSIONS ===== */
-  const missions = ["Intégration de solutions","Informatique - Télécom","Energie - BTP","Etude et réalisation de projets","Negos-Divers"];
+  const missions = ["Intégration de solutions", "Informatique - Télécom", "Energie - BTP", "Etude et réalisation de projets", "Negos-Divers"];
   let yMission = 14;
   doc.setFont("times", "normal");
   doc.setFontSize(9);
   missions.forEach(m => {
-    doc.circle(158, yMission-1.1, 0.7, "F"); 
+    doc.circle(158, yMission - 1.1, 0.7, "F");
     doc.text(m, 162, yMission);
-    yMission += 4.5; 
+    yMission += 4.5;
   });
 
   const headerBottomY = Math.max(30, yMission) + 1;
-  doc.setDrawColor(0,0,128);
+  doc.setDrawColor(0, 0, 128);
   doc.setLineWidth(0.6);
-  doc.line(1, headerBottomY, pageWidth-1, headerBottomY);
+  doc.line(1, headerBottomY, pageWidth - 1, headerBottomY);
 
   /* ===== DATE ===== */
   doc.setFontSize(11);
   doc.setTextColor(0);
-  doc.text(`Ouagadougou, le ${new Date().toLocaleDateString("fr-FR",{year:"numeric",month:"long",day:"numeric"})}`, pageWidth-11, headerBottomY+7, { align: "right" });
+  doc.text(`Ouagadougou, le ${new Date().toLocaleDateString("fr-FR", { year: "numeric", month: "long", day: "numeric" })}`, pageWidth - 11, headerBottomY + 7, { align: "right" });
 
   /* ===== INFOS CLIENT ===== */
   let y = 75;
@@ -121,12 +134,12 @@ export const generateInvoicePDFGTS = (invoiceData) => {
   const factureText = `Facture ${invoiceData.invoiceNumber || "-"}`;
   doc.text(factureText, 14, y);
   doc.line(14, y + 1, 14 + doc.getTextWidth(factureText), y + 1);
-  
+
   y += 6;
   const writeLabel = (label, value, x, yPos, maxWidth = 90) => {
     doc.setFont("times", "bold");
     const w = doc.getTextWidth(label);
-    if(label) {
+    if (label) {
       doc.text(label, x, yPos);
       doc.line(x, yPos + 1, x + w, yPos + 1);
     }
@@ -150,51 +163,50 @@ export const generateInvoicePDFGTS = (invoiceData) => {
   y += 10;
 
   /* ===== TABLEAU ===== */
-  if(invoiceData.summaryData?.length){
-    const tableHead = ["N°","Immatriculation","Bon","Date","Quantité (T)","Tarif (33000)","Retenue 5%","Montant net"];
-    
-    // Totaux
+  if (invoiceData.summaryData?.length) {
+    const tableHead = ["N°", "Immatriculation", "Bon", "Date", "Quantité (T)", "Tarif (33000)", "Retenue 5%", "Montant net"];
+
     const totQ = invoiceData.summaryData.reduce((acc, r) => acc + parseDecimal(r.quantite), 0);
     const totT = invoiceData.summaryData.reduce((acc, r) => acc + (Number(r.tarif) || 0), 0);
     const totR = invoiceData.summaryData.reduce((acc, r) => acc + (Number(r.retenue) || 0), 0);
     const totN = invoiceData.summaryData.reduce((acc, r) => acc + (Number(r.montantNet) || 0), 0);
 
-    const tableBody = invoiceData.summaryData.map((r,i)=>[
-      i+1, 
-      r.immatriculation||"-", 
-      r.bonLivraison||"-", 
-      r.dateDechargement||"-",
-      formatQuantity(parseDecimal(r.quantite)), // 2 chiffres après virgule
-      formatMoney(Number(r.tarif || 0)),         // Entier
-      formatMoney(Number(r.retenue)||0),         // Entier
-      formatMoney(Number(r.montantNet)||0)       // Entier
+    const tableBody = invoiceData.summaryData.map((r, i) => [
+      i + 1,
+      r.immatriculation || "-",
+      r.bonLivraison || "-",
+      r.dateDechargement || "-",
+      formatQuantity(parseDecimal(r.quantite)),
+      formatMoney(Number(r.tarif || 0)),
+      formatMoney(Number(r.retenue) || 0),
+      formatMoney(Number(r.montantNet) || 0)
     ]);
 
     tableBody.push([
-      { content: "TOTAL MONTANT À PAYER", colSpan: 4, styles: { halign: "center", fontStyle: "bold", fillColor: [240,240,240] } },
-      { content: formatQuantity(totQ), styles: { halign: "right", fontStyle: "bold", fillColor: [240,240,240] } },
-      { content: formatMoney(totT), styles: { halign: "right", fontStyle: "bold", fillColor: [240,240,240] } },
-      { content: formatMoney(totR), styles: { halign: "right", fontStyle: "bold", fillColor: [240,240,240] } },
-      { content: formatMoney(totN), styles: { halign: "right", fontStyle: "bold", fillColor: [240,240,240] } }
+      { content: "TOTAL MONTANT À PAYER", colSpan: 4, styles: { halign: "center", fontStyle: "bold", fillColor: [240, 240, 240] } },
+      { content: formatQuantity(totQ), styles: { halign: "right", fontStyle: "bold", fillColor: [240, 240, 240] } },
+      { content: formatMoney(totT), styles: { halign: "right", fontStyle: "bold", fillColor: [240, 240, 240] } },
+      { content: formatMoney(totR), styles: { halign: "right", fontStyle: "bold", fillColor: [240, 240, 240] } },
+      { content: formatMoney(totN), styles: { halign: "right", fontStyle: "bold", fillColor: [240, 240, 240] } }
     ]);
 
-    autoTable(doc,{
+    autoTable(doc, {
       startY: y,
       head: [tableHead],
       body: tableBody,
       theme: "grid",
-      styles: { fontSize: 9, font: "times", lineColor: [0,0,0], lineWidth: 0.1 },
-      headStyles: { fillColor: [220,220,220], textColor: 0, halign: "center" },
-      columnStyles: { 0:{cellWidth:8, halign:"center"}, 4:{halign:"right"}, 5:{halign:"right"}, 6:{halign:"right"}, 7:{halign:"right"} }
+      styles: { fontSize: 9, font: "times", lineColor: [0, 0, 0], lineWidth: 0.1 },
+      headStyles: { fillColor: [220, 220, 220], textColor: 0, halign: "center" },
+      columnStyles: { 0: { cellWidth: 8, halign: "center" }, 4: { halign: "right" }, 5: { halign: "right" }, 6: { halign: "right" }, 7: { halign: "right" } }
     });
 
     y = doc.lastAutoTable.finalY + 8;
-    doc.setFont("times","normal");
+    doc.setFont("times", "normal");
     doc.text("Arrêtée la présente facture à la somme HT de :", 14, y);
     y += 6;
     const words = convertNumberToWords(totN);
-    doc.setFont("times","bold");
-    doc.text(`${words.charAt(0).toUpperCase()+words.slice(1)} (${formatMoney(totN)}) francs CFA.`, 14, y);
+    doc.setFont("times", "bold");
+    doc.text(`${words.charAt(0).toUpperCase() + words.slice(1)} (${formatMoney(totN)}) francs CFA.`, 14, y);
 
     y += 30;
     doc.text("Le Directeur Général", 150, y);
@@ -207,7 +219,7 @@ export const generateInvoicePDFGTS = (invoiceData) => {
   doc.setFontSize(8);
   doc.setTextColor(100);
   const lines = doc.splitTextToSize(footerText, 180);
-  lines.forEach((line, i) => doc.text(line, 105, pageHeight - 15 + (i*4), { align: "center" }));
+  lines.forEach((line, i) => doc.text(line, 105, pageHeight - 15 + (i * 4), { align: "center" }));
 
   return doc;
 };
