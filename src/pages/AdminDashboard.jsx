@@ -5,7 +5,8 @@ import { Toaster, toast } from "react-hot-toast";
 
 import {
   Users, Truck, ClipboardList, AlertTriangle, FileWarning,
-  Sun, Moon, Menu, Loader2, GaugeCircle
+  Sun, Moon, Menu, Loader2, Gauge, ShieldAlert, ChevronRight,
+  LogOut, Activity, Circle
 } from "lucide-react";
 
 import AdminSidebar from "../components/AdminSidebar.jsx";
@@ -17,16 +18,13 @@ import AlertesExpiration from "../components/AlertesExpiration.jsx";
 import CarteFlotte from "../components/CarteFlotte.jsx";
 import BillingExpenses from "../components/BillingExpenses.jsx";
 import MaintenanceSection from "../components/MaintenanceSection.jsx";
-
-// --- Composants UI Internes ---
-const Card = ({ className = "", children }) => <div className={`rounded-xl ${className}`}>{children}</div>;
-const CardHeader = ({ className = "", children }) => <div className={`p-4 ${className}`}>{children}</div>;
-const CardContent = ({ className = "", children }) => <div className={`p-4 ${className}`}>{children}</div>;
+import PneusSection from "../components/PneusSection.jsx";
 
 const SECTION_TITLES = {
   dashboard: "Tableau de Bord",
   users: "Gestion des Utilisateurs",
   camions: "Gestion de la Flotte",
+  pneus: "Gestion des Pneus",
   missions: "Missions Actives",
   pannes: "Pannes Déclarées",
   maintenance: "Maintenance Camions",
@@ -34,25 +32,81 @@ const SECTION_TITLES = {
   billing: "Facturation et Dépenses",
 };
 
-const COLOR_SCHEMES = {
-  blue: { text: "text-blue-700 dark:text-blue-300" },
-  green: { text: "text-green-700 dark:text-green-300" },
-  orange: { text: "text-orange-700 dark:text-orange-300" },
-  red: { text: "text-red-700 dark:text-red-400" },
-  purple: { text: "text-purple-700 dark:text-purple-300" },
+const STAT_CONFIG = {
+  blue: {
+    bgLight: "bg-blue-50/50 hover:bg-blue-50 border-blue-100",
+    bgDark: "dark:bg-blue-950/20 dark:hover:bg-blue-950/30 dark:border-blue-900/40",
+    iconBg: "bg-blue-600/10 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400",
+    text: "text-blue-950 dark:text-blue-100",
+    accent: "bg-blue-500"
+  },
+  emerald: {
+    bgLight: "bg-emerald-50/50 hover:bg-emerald-50 border-emerald-100",
+    bgDark: "dark:bg-emerald-950/20 dark:hover:bg-emerald-950/30 dark:border-emerald-900/40",
+    iconBg: "bg-emerald-600/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400",
+    text: "text-emerald-950 dark:text-emerald-100",
+    accent: "bg-emerald-500"
+  },
+  amber: {
+    bgLight: "bg-amber-50/50 hover:bg-amber-50 border-amber-100",
+    bgDark: "dark:bg-amber-950/20 dark:hover:bg-amber-950/30 dark:border-amber-900/40",
+    iconBg: "bg-amber-600/10 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400",
+    text: "text-amber-950 dark:text-amber-100",
+    accent: "bg-amber-500"
+  },
+  rose: {
+    bgLight: "bg-rose-50/50 hover:bg-rose-50 border-rose-100",
+    bgDark: "dark:bg-rose-950/20 dark:hover:bg-rose-950/30 dark:border-rose-900/40",
+    iconBg: "bg-rose-600/10 text-rose-600 dark:bg-rose-500/20 dark:text-rose-400",
+    text: "text-rose-950 dark:text-rose-100",
+    accent: "bg-rose-500"
+  },
+  purple: {
+    bgLight: "bg-purple-50/50 hover:bg-purple-50 border-purple-100",
+    bgDark: "dark:bg-purple-950/20 dark:hover:bg-purple-950/30 dark:border-purple-900/40",
+    iconBg: "bg-purple-600/10 text-purple-600 dark:bg-purple-500/20 dark:text-purple-400",
+    text: "text-purple-950 dark:text-purple-100",
+    accent: "bg-purple-500"
+  },
 };
 
-const StatCard = ({ title, value, icon: Icon, color, onClick, blink = false }) => {
-  const scheme = COLOR_SCHEMES[color] || COLOR_SCHEMES.blue;
+const StatCard = ({ title, value, icon: Icon, color = "blue", onClick, blink = false }) => {
+  const config = STAT_CONFIG[color] || STAT_CONFIG.blue;
+
   return (
     <button
       onClick={onClick}
-      className={`flex flex-col items-center justify-center p-6 rounded-xl border border-gray-200 dark:border-gray-700 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm hover:shadow-2xl hover:scale-[1.03] transition-all w-full text-center group relative ${blink ? "border-red-500 ring-2 ring-red-500/20" : ""}`}
+      className={`relative group flex flex-col justify-between p-5 rounded-2xl border transition-all duration-300 transform hover:-translate-y-1 hover:shadow-xl text-left w-full backdrop-blur-xl ${config.bgLight} ${config.bgDark} ${
+        blink ? "ring-2 ring-rose-500/50 border-rose-500 animate-pulse" : ""
+      }`}
     >
-      {blink && <span className="absolute top-2 right-2 flex h-3 w-3"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span><span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span></span>}
-      <Icon className={`w-10 h-10 mb-2 ${blink ? "text-red-600 animate-pulse" : scheme.text} group-hover:rotate-6 transition-transform`} />
-      <h3 className={`font-semibold text-lg mb-1 ${scheme.text}`}>{title}</h3>
-      <p className={`text-3xl font-extrabold ${scheme.text}`}>{value}</p>
+      {blink && (
+        <span className="absolute top-3 right-3 flex h-3 w-3">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+          <span className="relative inline-flex rounded-full h-3 w-3 bg-rose-600"></span>
+        </span>
+      )}
+
+      <div className="flex items-center justify-between mb-4">
+        <div className={`p-3 rounded-xl transition-transform duration-300 group-hover:scale-110 ${config.iconBg}`}>
+          <Icon className="w-6 h-6" />
+        </div>
+        <ChevronRight className="w-4 h-4 text-slate-400 opacity-0 group-hover:opacity-100 transition-all group-hover:translate-x-1" />
+      </div>
+
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
+          {title}
+        </p>
+        <div className="flex items-baseline justify-between">
+          <span className={`text-3xl font-extrabold tracking-tight ${config.text}`}>
+            {value}
+          </span>
+          <span className="text-xs text-slate-400 font-medium group-hover:underline">
+            Voir détails
+          </span>
+        </div>
+      </div>
     </button>
   );
 };
@@ -106,9 +160,16 @@ export default function AdminDashboard() {
       const userStructure = profile.structure;
       const isAdmin = userRole === "admin";
 
+      // Récupération sécurisée du nom, prénom ou nom complet
+      const prenom = profile.prenom || "";
+      const nom = profile.nom || "";
+      const fullNameComputed = (prenom && nom) ? `${prenom} ${nom}` : (profile.full_name || authUser.email);
+
       setUser({ 
         ...authUser, 
-        full_name: profile.full_name || authUser.email, 
+        full_name: fullNameComputed,
+        prenom: prenom,
+        nom: nom,
         avatar: profile.avatar_url,
         role: userRole,
         structure: userStructure
@@ -116,7 +177,6 @@ export default function AdminDashboard() {
 
       const activeStatus = ["En cours", "En chargement", "En dechargement"];
 
-      // --- FILTRAGE SQL PAR STRUCTURE ---
       let profilesQuery = supabase.from("profiles").select("id, cnib_expiration, permis_expiration, carte_expiration, structure");
       let camionsQuery = supabase.from("camions").select("*, structure");
 
@@ -133,7 +193,6 @@ export default function AdminDashboard() {
         supabase.from("alertespannes").select("id").eq("statut", "en_cours")
       ]);
 
-      // --- CALCUL DES DOCUMENTS (Logique J-15) ---
       const today = new Date();
       let docsUrgentsCount = 0;
 
@@ -155,9 +214,7 @@ export default function AdminDashboard() {
         if (checkDate(c.visitetechniqueexpiry)) docsUrgentsCount++;
       });
 
-      // --- MISE À JOUR STATS & NOTIFICATIONS ---
       setStats(prev => {
-        // Notifier si le nombre de docs augmente
         if (docsUrgentsCount > prev.docs && prev.docs !== 0) {
           playNotificationSound();
           toast.error("Nouvelle alerte document détectée !", { icon: "📅" });
@@ -186,7 +243,6 @@ export default function AdminDashboard() {
     fetchData();
   }, [fetchData]);
 
-  // --- REALTIME ---
   useEffect(() => {
     const channel = supabase
       .channel("dashboard-realtime")
@@ -195,11 +251,10 @@ export default function AdminDashboard() {
         toast.error(`Nouvelle panne détectée !`, {
           duration: 6000,
           icon: '⚠️',
-          style: { borderRadius: '12px', background: '#ef4444', color: '#fff', fontWeight: 'bold' },
+          style: { borderRadius: '12px', background: '#f43f5e', color: '#fff', fontWeight: 'bold' },
         });
         fetchData();
       })
-      // Surveillance des changements sur les camions et profils pour les dates
       .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, fetchData)
       .on("postgres_changes", { event: "*", schema: "public", table: "camions" }, fetchData)
       .on("postgres_changes", { event: "*", schema: "public", table: "alertespannes" }, fetchData)
@@ -212,14 +267,18 @@ export default function AdminDashboard() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-900">
-        <Loader2 className="h-10 w-10 animate-spin text-blue-600" />
+      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50 dark:bg-slate-950">
+        <div className="relative">
+          <div className="w-16 h-16 rounded-full border-4 border-blue-200 dark:border-blue-900/40 animate-pulse"></div>
+          <Loader2 className="h-16 w-16 animate-spin text-blue-600 absolute inset-0" />
+        </div>
+        <p className="mt-4 text-slate-500 dark:text-slate-400 font-medium animate-pulse">Chargement de la flotte...</p>
       </div>
     );
   }
 
   return (
-    <div className="relative min-h-screen bg-gray-50 dark:bg-gray-950 flex overflow-hidden font-sans">
+    <div className="relative min-h-screen bg-slate-50 dark:bg-slate-950 flex overflow-hidden font-sans antialiased text-slate-900 dark:text-slate-100">
       <Toaster position="top-right" reverseOrder={false} />
 
       <AdminSidebar 
@@ -232,62 +291,120 @@ export default function AdminDashboard() {
       />
 
       <div className="flex-1 flex flex-col min-w-0 w-full md:pl-72">
-        <header className="bg-white/90 dark:bg-gray-800/90 shadow-sm px-6 py-4 flex justify-between items-center sticky top-0 z-10 w-full backdrop-blur-md border-b border-gray-200 dark:border-gray-700">
+        <header className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md sticky top-0 z-20 w-full px-6 py-4 flex justify-between items-center border-b border-slate-200/80 dark:border-slate-800">
           <div className="flex items-center gap-3">
-            <button onClick={() => setMenuOpen(true)} className="md:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
-              <Menu className="w-6 h-6 text-gray-800 dark:text-gray-100" />
+            <button 
+              onClick={() => setMenuOpen(true)} 
+              className="md:hidden p-2.5 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            >
+              <Menu className="w-6 h-6" />
             </button>
-            <h1 className="text-xl font-bold text-gray-900 dark:text-white truncate">{SECTION_TITLES[section]}</h1>
+            <div>
+              <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
+                {SECTION_TITLES[section]}
+              </h1>
+              {section === "dashboard" && (
+                <p className="text-xs text-slate-500 dark:text-slate-400 hidden sm:block">
+                  Supervision globale et télémétrie de la flotte
+                </p>
+              )}
+            </div>
           </div>
-          <button 
-            onClick={() => { 
-              const mode = !darkMode; 
-              setDarkMode(mode); 
-              document.documentElement.classList.toggle("dark", mode); 
-              localStorage.setItem("darkMode", mode); 
-            }} 
-            className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 transition-all hover:ring-2 hover:ring-blue-500/50"
-          >
-            {darkMode ? <Sun className="w-5 h-5 text-yellow-400" /> : <Moon className="w-5 h-5 text-gray-700" />}
-          </button>
+
+          <div className="flex items-center gap-3">
+            {user?.structure && (
+              <span className="hidden sm:inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                {user.structure}
+              </span>
+            )}
+
+            <button 
+              onClick={() => { 
+                const mode = !darkMode; 
+                setDarkMode(mode); 
+                document.documentElement.classList.toggle("dark", mode); 
+                localStorage.setItem("darkMode", mode); 
+              }} 
+              className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 transition-all hover:scale-105"
+              aria-label="Toggle Theme"
+            >
+              {darkMode ? <Sun className="w-5 h-5 text-amber-400" /> : <Moon className="w-5 h-5 text-slate-600" />}
+            </button>
+          </div>
         </header>
 
-        <main className="flex-1 w-full overflow-y-auto px-4 sm:px-6 py-6">
-          <div className="max-w-7xl mx-auto">
+        <main className="flex-1 w-full overflow-y-auto px-4 sm:px-8 py-8">
+          <div className="max-w-7xl mx-auto space-y-8">
             {section === "dashboard" ? (
-              <div className="space-y-6">
-                <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm">
-                  <CardHeader>
-                    <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100 flex items-center gap-3">
-                      <GaugeCircle size={24} className="text-blue-600" /> 
-                      Vue d'ensemble
-                    </h2>
-                  </CardHeader>
-                </Card>
+              <div className="space-y-8">
+                <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-blue-600 via-indigo-600 to-slate-900 p-6 sm:p-8 text-white shadow-xl">
+                  <div className="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                    <div>
+                      <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md text-xs font-medium mb-3">
+                        <Activity className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
+                        <span>Système Opérationnel</span>
+                      </div>
+                      <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
+                        Bonjour, {user?.prenom || user?.full_name?.split(" ")[0] || "Administrateur"} 👋
+                      </h2>
+                      <p className="mt-1 text-sm text-blue-100/80 max-w-xl">
+                        Voici un aperçu en temps réel de vos opérations, véhicules en déplacement et alertes prioritaires.
+                      </p>
+                    </div>
 
-                <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-5 gap-4">
+                    {(hasPanneEnCours || hasDocsUrgents) && (
+                      <div className="flex items-center gap-3 bg-white/10 backdrop-blur-lg p-3 rounded-2xl border border-white/20">
+                        <ShieldAlert className="w-8 h-8 text-rose-400 animate-bounce" />
+                        <div className="text-xs">
+                          <p className="font-bold text-white">Attention requise</p>
+                          <p className="text-blue-100">
+                            {hasPanneEnCours ? "Panne(s) non résolue(s)" : "Document(s) à renouveler"}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="absolute -right-10 -bottom-10 w-64 h-64 rounded-full bg-blue-500/20 blur-3xl pointer-events-none"></div>
+                  <div className="absolute right-1/3 -top-10 w-48 h-48 rounded-full bg-indigo-500/20 blur-2xl pointer-events-none"></div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
                   <StatCard title="Utilisateurs" value={stats.users} icon={Users} color="blue" onClick={() => changeSection("users")} />
-                  <StatCard title="Flotte" value={stats.camions} icon={Truck} color="green" onClick={() => changeSection("camions")} />
-                  <StatCard title="Missions" value={stats.missions} icon={ClipboardList} color="orange" onClick={() => changeSection("missions")} />
-                  <StatCard title="Pannes" value={stats.pannes} icon={AlertTriangle} color="red" blink={hasPanneEnCours} onClick={() => changeSection("pannes")} />
+                  <StatCard title="Flotte" value={stats.camions} icon={Truck} color="emerald" onClick={() => changeSection("camions")} />
+                  <StatCard title="Missions" value={stats.missions} icon={ClipboardList} color="amber" onClick={() => changeSection("missions")} />
+                  <StatCard title="Pannes" value={stats.pannes} icon={AlertTriangle} color="rose" blink={hasPanneEnCours} onClick={() => changeSection("pannes")} />
                   <StatCard title="Alertes Docs" value={stats.docs} icon={FileWarning} color="purple" blink={hasDocsUrgents} onClick={() => changeSection("documents")} />
                 </div>
 
-                <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
-                  <CardHeader className="border-b border-gray-100 dark:border-gray-700">
-                    <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100">Localisation en Temps Réel</h3>
-                  </CardHeader>
-                  <CardContent className="p-0 sm:p-4">
-                    <div className="h-96 rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700">
+                <div className="rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-hidden transition-all">
+                  <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                    <div>
+                      <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                        <Gauge className="w-5 h-5 text-blue-600" />
+                        Geofencing & Localisation
+                      </h3>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                        Position en direct de l'ensemble de vos poids lourds
+                      </p>
+                    </div>
+                    <span className="flex items-center gap-2 text-xs font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-3 py-1.5 rounded-full border border-emerald-200 dark:border-emerald-800">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+                      GPS Actif
+                    </span>
+                  </div>
+                  <div className="p-2 sm:p-4">
+                    <div className="h-[420px] w-full rounded-2xl overflow-hidden border border-slate-200/60 dark:border-slate-800 shadow-inner">
                       <CarteFlotte camions={camions} center={[12.37, -1.53]} />
                     </div>
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
               </div>
             ) : (
-              <div className="w-full animate-in fade-in slide-in-from-bottom-2 duration-300">
+              <div className="w-full animate-in fade-in duration-300">
                 {section === "users" && <UserSection />}
                 {section === "camions" && <CamionsSection />}
+                {section === "pneus" && <PneusSection role={user?.role} structure={user?.structure} />}
                 {section === "missions" && <MissionsSection />}
                 {section === "pannes" && <PannesDeclarees role={user?.role} structure={user?.structure} />}
                 {section === "maintenance" && <MaintenanceSection camions={camions} />}
